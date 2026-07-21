@@ -7,6 +7,19 @@ This guide walks you through deploying Corveil AI Gateway on Kubernetes and conf
 - **Kubernetes cluster** (1.23+) with `kubectl` configured
 - **Helm** 3.10+
 - **At least one LLM provider API key** (OpenRouter recommended for quickest setup)
+- **Pull access to the Corveil image.** The default image `ghcr.io/corveil/corveil`
+  is a **private** GHCR package. Create a pull secret and pass it to the chart via
+  `imagePullSecrets` (see below), or override `image.repository` with an image your
+  cluster can already pull.
+
+  ```bash
+  kubectl create secret docker-registry corveil-ghcr \
+    --docker-server=ghcr.io \
+    --docker-username=<github-user> \
+    --docker-password=<github-token-with-read:packages>
+  ```
+
+  Then add `--set imagePullSecrets[0].name=corveil-ghcr` to the install commands below.
 
 ## Step 1: Install the Chart
 

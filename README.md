@@ -29,6 +29,22 @@ Click **Dev Login** to get started immediately — no OIDC setup required.
 
 - Kubernetes 1.23+
 - Helm 3.10+
+- **Pull access to the Corveil image.** The default image
+  (`ghcr.io/corveil/corveil`) is a **private** package. Create an image pull
+  secret and reference it so the cluster can pull it:
+
+  ```bash
+  kubectl create secret docker-registry corveil-ghcr \
+    --docker-server=ghcr.io \
+    --docker-username=<github-user> \
+    --docker-password=<github-token-with-read:packages>
+
+  helm install corveil oci://ghcr.io/corveil/corveil-helm/corveil-chart \
+    --set imagePullSecrets[0].name=corveil-ghcr \
+    ...
+  ```
+
+  Skip this only if you override `image.repository` to an image your cluster can already pull.
 
 ## Documentation
 
