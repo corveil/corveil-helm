@@ -1,4 +1,4 @@
-# Default values for Citadel AI Gateway.
+# Default values for Corveil AI Gateway.
 # This is a YAML-formatted file.
 
 domain: "bigbang.dev"
@@ -6,16 +6,16 @@ domain: "bigbang.dev"
 replicaCount: 1
 
 image:
-  repository: ghcr.io/radiusmethod/citadel
+  repository: ghcr.io/corveil/corveil
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
   tag: ""
 
-nameOverride: ""
-fullnameOverride: "citadel"
+nameOverride: "corveil"
+fullnameOverride: "corveil"
 
-# -- Citadel application config
-citadel:
+# -- Corveil application config
+corveil:
   environment: production
   logLevel: INFO
   secretKey: ""
@@ -50,14 +50,6 @@ rateLimiting:
 logging:
   requestBody: true
   responseBody: true
-
-# -- SocketZero JWT authentication (keyless)
-socketzero:
-  enabled: false
-  jwtPublicKey: ""
-  jwtHeader: "X-SocketZero-Jwt-Assertion"
-  jwtAudience: "citadel"
-  jwtIssuer: "socketzero"
 
 # -- LLM Provider API keys
 providers:
@@ -108,11 +100,11 @@ externalRedis:
 # -- Istio / Big Bang integration
 istio:
   enabled: false
-  citadel:
+  corveil:
     gateways:
       - "istio-system/public"
     hosts:
-      - "citadel.{{ .Values.domain }}"
+      - "corveil.{{ .Values.domain }}"
   mtls:
     mode: STRICT
 
@@ -122,7 +114,7 @@ ingress:
   className: ""
   annotations: {}
   hosts:
-    - host: citadel.example.com
+    - host: corveil.example.com
       paths:
         - path: /
           pathType: Prefix
@@ -174,7 +166,7 @@ networkPolicy:
   # -- Additional egress rules (e.g., to allow specific LLM API endpoints)
   additionalEgressRules: []
 
-# -- Extra environment variables to inject into the Citadel container
+# -- Extra environment variables to inject into the Corveil container
 extraEnv: []
 # - name: MY_CUSTOM_VAR
 #   value: "my-value"
@@ -185,7 +177,7 @@ extraVolumes: []
 #   configMap:
 #     name: my-config
 
-# -- Extra volume mounts for the Citadel container
+# -- Extra volume mounts for the Corveil container
 extraVolumeMounts: []
 # - name: my-config
 #   mountPath: /app/custom-config

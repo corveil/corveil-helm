@@ -1,13 +1,13 @@
 apiVersion: v2
-name: citadel-chart
-description: Helm chart for Citadel AI Gateway. Big Bang ready.
+name: corveil-chart
+description: Helm chart for Corveil AI Gateway. Big Bang ready.
 type: application
 
 # Chart version — increment on each release
-version: 0.2.1
+version: 1.0.0
 
 # Application version deployed by this chart
-appVersion: "0.2.1"
+appVersion: "0.3.4"
 
 dependencies:
   - name: postgresql

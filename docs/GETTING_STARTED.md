@@ -1,12 +1,25 @@
-# Getting Started with Citadel
+# Getting Started with Corveil
 
-This guide walks you through deploying Citadel AI Gateway on Kubernetes and configuring clients to use it.
+This guide walks you through deploying Corveil AI Gateway on Kubernetes and configuring clients to use it.
 
 ## Prerequisites
 
 - **Kubernetes cluster** (1.23+) with `kubectl` configured
 - **Helm** 3.10+
 - **At least one LLM provider API key** (OpenRouter recommended for quickest setup)
+- **Pull access to the Corveil image.** The default image `ghcr.io/corveil/corveil`
+  is a **private** GHCR package. Create a pull secret and pass it to the chart via
+  `imagePullSecrets` (see below), or override `image.repository` with an image your
+  cluster can already pull.
+
+  ```bash
+  kubectl create secret docker-registry corveil-ghcr \
+    --docker-server=ghcr.io \
+    --docker-username=<github-user> \
+    --docker-password=<github-token-with-read:packages>
+  ```
+
+  Then add `--set imagePullSecrets[0].name=corveil-ghcr` to the install commands below.
 
 ## Step 1: Install the Chart
 
@@ -15,10 +28,10 @@ This guide walks you through deploying Citadel AI Gateway on Kubernetes and conf
 Evaluation mode enables dev login so you can explore the UI, create users, and generate API keys without configuring OIDC.
 
 ```bash
-helm install citadel oci://ghcr.io/radiusmethod/citadel-helm/citadel-chart \
-  --set citadel.secretKey="$(openssl rand -hex 32)" \
-  --set citadel.environment=development \
-  --set citadel.devLoginEnabled=true \
+helm install corveil oci://ghcr.io/corveil/corveil-helm/corveil-chart \
+  --set corveil.secretKey="$(openssl rand -hex 32)" \
+  --set corveil.environment=development \
+  --set corveil.devLoginEnabled=true \
   --set providers.openrouter.apiKey="sk-or-v1-YOUR-KEY"
 ```
 
@@ -26,26 +39,26 @@ helm install citadel oci://ghcr.io/radiusmethod/citadel-helm/citadel-chart \
 
 | Flag | Purpose |
 |------|---------|
-| `citadel.secretKey` | Signing key for sessions and tokens. Generate a random one. |
-| `citadel.environment=development` | Enables debug-friendly behavior. |
-| `citadel.devLoginEnabled=true` | Adds a "Dev Login" button to the UI — no OIDC required. |
+| `corveil.secretKey` | Signing key for sessions and tokens. Generate a random one. |
+| `corveil.environment=development` | Enables debug-friendly behavior. |
+| `corveil.devLoginEnabled=true` | Adds a "Dev Login" button to the UI — no OIDC required. |
 | `providers.openrouter.apiKey` | Your OpenRouter API key. Get one at [openrouter.ai](https://openrouter.ai). |
 
-This deploys Citadel with a bundled PostgreSQL instance. No external database needed.
+This deploys Corveil with a bundled PostgreSQL instance. No external database needed.
 
 ## Step 2: Verify the Deployment
 
 Wait for all pods to be ready:
 
 ```bash
-kubectl get pods -l app.kubernetes.io/name=citadel -w
+kubectl get pods -l app.kubernetes.io/name=corveil -w
 ```
 
 Check health endpoints:
 
 ```bash
-# Port-forward to access Citadel locally
-kubectl port-forward svc/citadel 8000:8000 &
+# Port-forward to access Corveil locally
+kubectl port-forward svc/corveil 8000:8000 &
 
 # Liveness check
 curl -s http://localhost:8000/health | jq .
@@ -58,7 +71,7 @@ curl -s http://localhost:8000/health/ready | jq .
 
 ## Step 3: Access the UI
 
-Open the Citadel management UI:
+Open the Corveil management UI:
 
 ```bash
 open http://localhost:8000/ui
@@ -91,7 +104,7 @@ curl -s http://localhost:8000/api/keys \
 
 ## Step 5: Configure Claude Code
 
-Claude Code can use Citadel as its API backend. Configure it with:
+Claude Code can use Corveil as its API backend. Configure it with:
 
 ### Option A: Environment variables
 
@@ -120,7 +133,7 @@ Then set your API key when prompted, or via:
 
 ### Option C: Passthrough mode (Claude Code Max / own Anthropic key)
 
-If you have your own Anthropic subscription, route through Citadel for logging and guardrails while using your own auth:
+If you have your own Anthropic subscription, route through Corveil for logging and guardrails while using your own auth:
 
 ```bash
 export ANTHROPIC_BASE_URL="http://localhost:8000"
@@ -167,7 +180,7 @@ curl http://localhost:8000/v1/chat/completions \
 
 ### Anthropic Messages API
 
-Citadel also supports the native Anthropic Messages API format:
+Corveil also supports the native Anthropic Messages API format:
 
 ```bash
 curl http://localhost:8000/v1/messages \
@@ -183,7 +196,7 @@ curl http://localhost:8000/v1/messages \
 
 ## Step 7: Provider Setup
 
-Citadel supports multiple LLM providers. Configure the ones you need:
+Corveil supports multiple LLM providers. Configure the ones you need:
 
 ### OpenRouter (recommended for getting started)
 
@@ -247,8 +260,8 @@ Before deploying to production, review this checklist:
 
 - [ ] **Set a strong `secretKey`**: `openssl rand -hex 32`
 - [ ] **Set `uiSessionSecret`** for production: `openssl rand -hex 32`
-- [ ] **Disable dev login**: `citadel.devLoginEnabled: false` (default)
-- [ ] **Set environment to production**: `citadel.environment: production` (default)
+- [ ] **Disable dev login**: `corveil.devLoginEnabled: false` (default)
+- [ ] **Set environment to production**: `corveil.environment: production` (default)
 - [ ] **Configure OIDC** (Okta) for user authentication
 - [ ] **Use `existingSecret`** with a secrets manager (Vault, Sealed Secrets, ESO) instead of plaintext values
 - [ ] **Change the PostgreSQL password** from the default `"citadel"`
@@ -272,7 +285,7 @@ Before deploying to production, review this checklist:
 ### Example production values
 
 ```yaml
-citadel:
+corveil:
   secretKey: ""  # Use existingSecret instead
   environment: production
   devLoginEnabled: false
@@ -281,7 +294,7 @@ citadel:
     domain: "company.okta.com"
     clientId: "0oaXXXXXX"
 
-existingSecret: "citadel-secrets"  # Managed by Vault/ESO
+existingSecret: "corveil-secrets"  # Managed by Vault/ESO
 
 postgresql:
   enabled: false
@@ -308,14 +321,14 @@ ingress:
   annotations:
     cert-manager.io/cluster-issuer: "letsencrypt-prod"
   hosts:
-    - host: citadel.your-domain.com
+    - host: corveil.your-domain.com
       paths:
         - path: /
           pathType: Prefix
   tls:
-    - secretName: citadel-tls
+    - secretName: corveil-tls
       hosts:
-        - citadel.your-domain.com
+        - corveil.your-domain.com
 ```
 
 ## Troubleshooting
@@ -325,12 +338,12 @@ ingress:
 Check the logs:
 
 ```bash
-kubectl logs -l app.kubernetes.io/name=citadel --previous
+kubectl logs -l app.kubernetes.io/name=corveil --previous
 ```
 
 Common causes:
 - **Missing `DATABASE_URL`**: Ensure PostgreSQL is ready or external DB URL is correct
-- **Missing `SECRET_KEY`**: Set `citadel.secretKey` or provide it via `existingSecret`
+- **Missing `SECRET_KEY`**: Set `corveil.secretKey` or provide it via `existingSecret`
 - **Invalid provider credentials**: Check API keys are correct
 
 ### ImagePullBackOff
@@ -338,10 +351,10 @@ Common causes:
 The container image may not be accessible:
 
 ```bash
-kubectl describe pod -l app.kubernetes.io/name=citadel
+kubectl describe pod -l app.kubernetes.io/name=corveil
 ```
 
-- Verify image exists: `docker pull ghcr.io/radiusmethod/citadel:0.2.0`
+- Verify image exists: `docker pull ghcr.io/corveil/corveil:0.3.4`
 - For private registries, set `imagePullSecrets`
 
 ### Database connection failures
@@ -353,19 +366,19 @@ The init container waits up to 60 seconds for the database. If it times out:
 kubectl get pods -l app.kubernetes.io/name=postgresql
 
 # Check init container logs
-kubectl logs citadel-XXXXX -c wait-for-db
+kubectl logs corveil-XXXXX -c wait-for-db
 ```
 
 ### 401 Unauthorized from Claude Code
 
 1. Verify your `sk-citadel-` key is correct and active
 2. Check the key hasn't expired
-3. Ensure `ANTHROPIC_BASE_URL` points to the correct Citadel instance
-4. For passthrough mode, verify `citadel.passthrough.enabled: true`
+3. Ensure `ANTHROPIC_BASE_URL` points to the correct Corveil instance
+4. For passthrough mode, verify `corveil.passthrough.enabled: true`
 
 ### Models not showing up
 
-1. Check the models ConfigMap: `kubectl get configmap -l app.kubernetes.io/name=citadel`
+1. Check the models ConfigMap: `kubectl get configmap -l app.kubernetes.io/name=corveil`
 2. Verify provider API keys are set for the providers your models reference
 3. For custom models, ensure `modelsConfig` is correctly formatted YAML
 
@@ -375,5 +388,5 @@ This means the database is not connected. Check:
 
 ```bash
 # PostgreSQL connectivity
-kubectl exec -it citadel-XXXXX -- curl -s http://localhost:8000/health/ready
+kubectl exec -it corveil-XXXXX -- curl -s http://localhost:8000/health/ready
 ```

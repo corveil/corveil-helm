@@ -10,8 +10,8 @@
 
 <!-- How did you test these changes? -->
 
-- [ ] `helm lint . --set citadel.secretKey=test` passes
-- [ ] `helm template citadel . --set citadel.secretKey=test` renders correctly
+- [ ] `helm lint . --set corveil.secretKey=test` passes
+- [ ] `helm template corveil . --set corveil.secretKey=test` renders correctly
 
 ## Checklist
 

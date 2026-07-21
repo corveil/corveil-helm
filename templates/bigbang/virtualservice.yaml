@@ -2,19 +2,19 @@
 apiVersion: networking.istio.io/v1beta1
 kind: VirtualService
 metadata:
-  name: citadel
+  name: corveil
   namespace: {{ .Release.Namespace }}
   labels:
-    {{- include "citadel.labels" . | nindent 4 }}
-    app.kubernetes.io/part-of: citadel
-    app.kubernetes.io/component: citadel
+    {{- include "corveil.labels" . | nindent 4 }}
+    app.kubernetes.io/part-of: corveil
+    app.kubernetes.io/component: corveil
 spec:
   gateways:
-  {{- range .Values.istio.citadel.gateways }}
+  {{- range .Values.istio.corveil.gateways }}
     - {{ . }}
   {{- end }}
   hosts:
-  {{- range .Values.istio.citadel.hosts }}
+  {{- range .Values.istio.corveil.hosts }}
     - {{ tpl . $ }}
   {{- end }}
   http:
@@ -22,5 +22,5 @@ spec:
         - destination:
             port:
               number: {{ .Values.service.port }}
-            host: {{ include "citadel.fullname" . }}.{{ .Release.Namespace }}.svc.cluster.local
+            host: {{ include "corveil.fullname" . }}.{{ .Release.Namespace }}.svc.cluster.local
 {{- end }}

@@ -1,64 +1,64 @@
 # Configuration Reference
 
-Complete reference for all `values.yaml` parameters in the Citadel Helm chart.
+Complete reference for all `values.yaml` parameters in the Corveil Helm chart.
 
 ## Core Settings
 
 | Parameter | Description | Default | Env Var |
 |-----------|-------------|---------|---------|
-| `replicaCount` | Number of Citadel pod replicas | `1` | — |
-| `image.repository` | Container image repository | `ghcr.io/radiusmethod/citadel` | — |
+| `replicaCount` | Number of Corveil pod replicas | `1` | — |
+| `image.repository` | Container image repository | `ghcr.io/corveil/corveil` | — |
 | `image.pullPolicy` | Image pull policy | `IfNotPresent` | — |
 | `image.tag` | Image tag (defaults to chart `appVersion`) | `""` | — |
-| `nameOverride` | Override the chart name | `""` | — |
-| `fullnameOverride` | Override the full resource name | `"citadel"` | — |
+| `nameOverride` | `app.kubernetes.io/name` label value. Changing it on an existing release alters the immutable Deployment selector — see CHANGELOG [1.0.0] Upgrade. | `"corveil"` | — |
+| `fullnameOverride` | Override the full resource name | `"corveil"` | — |
 | `domain` | Base domain for Big Bang integration | `"bigbang.dev"` | — |
 | `imagePullSecrets` | Image pull secrets for private registries | `[]` | — |
 
-## Citadel Application
+## Corveil Application
 
 | Parameter | Description | Default | Env Var |
 |-----------|-------------|---------|---------|
-| `citadel.environment` | Application environment (`development`, `staging`, `production`) | `production` | `ENVIRONMENT` |
-| `citadel.logLevel` | Log level (`DEBUG`, `INFO`, `WARNING`, `ERROR`) | `INFO` | `LOG_LEVEL` |
-| `citadel.secretKey` | Secret key for signing sessions and tokens (**required**) | `""` | `SECRET_KEY` |
-| `citadel.apiKeyPrefix` | Prefix for generated API keys | `"sk-citadel"` | `API_KEY_PREFIX` |
-| `citadel.autoProvisionUsers` | Auto-create users on first authentication | `true` | `AUTO_PROVISION_USERS` |
-| `citadel.devLoginEnabled` | Enable dev login bypass (disable in production) | `false` | `DEV_LOGIN_ENABLED` |
+| `corveil.environment` | Application environment (`development`, `staging`, `production`) | `production` | `ENVIRONMENT` |
+| `corveil.logLevel` | Log level (`DEBUG`, `INFO`, `WARNING`, `ERROR`) | `INFO` | `LOG_LEVEL` |
+| `corveil.secretKey` | Secret key for signing sessions and tokens (**required**) | `""` | `SECRET_KEY` |
+| `corveil.apiKeyPrefix` | Prefix for generated API keys | `"sk-citadel"` | `API_KEY_PREFIX` |
+| `corveil.autoProvisionUsers` | Auto-create users on first authentication | `true` | `AUTO_PROVISION_USERS` |
+| `corveil.devLoginEnabled` | Enable dev login bypass (disable in production) | `false` | `DEV_LOGIN_ENABLED` |
 
 ### Guardrails
 
 | Parameter | Description | Default | Env Var |
 |-----------|-------------|---------|---------|
-| `citadel.guardrails.enabled` | Enable the guardrails system | `true` | `GUARDRAILS_ENABLED` |
-| `citadel.guardrails.openaiModeration` | Enable OpenAI moderation API guardrail | `true` | `GUARDRAIL_OPENAI_MODERATION` |
-| `citadel.guardrails.piiFilter` | Enable PII detection and filtering | `false` | `GUARDRAIL_PII_FILTER` |
+| `corveil.guardrails.enabled` | Enable the guardrails system | `true` | `GUARDRAILS_ENABLED` |
+| `corveil.guardrails.openaiModeration` | Enable OpenAI moderation API guardrail | `true` | `GUARDRAIL_OPENAI_MODERATION` |
+| `corveil.guardrails.piiFilter` | Enable PII detection and filtering | `false` | `GUARDRAIL_PII_FILTER` |
 
 ### Passthrough
 
 | Parameter | Description | Default | Env Var |
 |-----------|-------------|---------|---------|
-| `citadel.passthrough.enabled` | Enable passthrough mode for client-provided auth | `true` | `PASSTHROUGH_ENABLED` |
+| `corveil.passthrough.enabled` | Enable passthrough mode for client-provided auth | `true` | `PASSTHROUGH_ENABLED` |
 
-When passthrough is enabled, clients can send their own LLM provider credentials via the `Authorization` header while using a Citadel key in `x-citadel-api-key` for gateway authentication. Useful for Claude Code Max users.
+When passthrough is enabled, clients can send their own LLM provider credentials via the `Authorization` header while using a Corveil key in `x-citadel-api-key` for gateway authentication. Useful for Claude Code Max users.
 
 ### Plugins
 
 | Parameter | Description | Default | Env Var |
 |-----------|-------------|---------|---------|
-| `citadel.plugins.enabled` | Enable the plugin system | `true` | `PLUGINS_ENABLED` |
+| `corveil.plugins.enabled` | Enable the plugin system | `true` | `PLUGINS_ENABLED` |
 
 ### Okta / OIDC
 
 | Parameter | Description | Default | Env Var |
 |-----------|-------------|---------|---------|
-| `citadel.okta.enabled` | Enable Okta OIDC authentication | `false` | — |
-| `citadel.okta.domain` | Okta domain (e.g., `company.okta.com`) | `""` | `OKTA_DOMAIN` |
-| `citadel.okta.clientId` | Okta OAuth client ID | `""` | `OKTA_CLIENT_ID` |
-| `citadel.okta.clientSecret` | Okta OAuth client secret | `""` | `OKTA_CLIENT_SECRET` |
-| `citadel.okta.sessionSecret` | Secret for encrypting UI sessions | `""` | `UI_SESSION_SECRET` |
-| `citadel.okta.sessionExpiryHours` | Session expiry in hours | `24` | `UI_SESSION_EXPIRY_HOURS` |
-| `citadel.okta.baseUrl` | Base URL for OIDC redirect (if behind proxy) | `""` | `UI_BASE_URL` |
+| `corveil.okta.enabled` | Enable Okta OIDC authentication | `false` | — |
+| `corveil.okta.domain` | Okta domain (e.g., `company.okta.com`) | `""` | `OKTA_DOMAIN` |
+| `corveil.okta.clientId` | Okta OAuth client ID | `""` | `OKTA_CLIENT_ID` |
+| `corveil.okta.clientSecret` | Okta OAuth client secret | `""` | `OKTA_CLIENT_SECRET` |
+| `corveil.okta.sessionSecret` | Secret for encrypting UI sessions | `""` | `UI_SESSION_SECRET` |
+| `corveil.okta.sessionExpiryHours` | Session expiry in hours | `24` | `UI_SESSION_EXPIRY_HOURS` |
+| `corveil.okta.baseUrl` | Base URL for OIDC redirect (if behind proxy) | `""` | `UI_BASE_URL` |
 
 ## Rate Limiting
 
@@ -77,18 +77,6 @@ Rate limits can also be set per-key when creating API keys via the management AP
 | `logging.responseBody` | Store full response bodies in logs | `true` | `LOG_RESPONSE_BODY` |
 
 Enabling body logging significantly increases storage usage but provides a full audit trail.
-
-## SocketZero JWT Authentication
-
-Keyless authentication via signed JWTs from SocketZero Receiver.
-
-| Parameter | Description | Default | Env Var |
-|-----------|-------------|---------|---------|
-| `socketzero.enabled` | Enable SocketZero JWT authentication | `false` | `TRUST_SOCKETZERO_JWT` |
-| `socketzero.jwtPublicKey` | PEM-encoded RS256 public key for JWT verification | `""` | `SOCKETZERO_JWT_PUBLIC_KEY` |
-| `socketzero.jwtHeader` | HTTP header containing the JWT | `"X-SocketZero-Jwt-Assertion"` | `SOCKETZERO_JWT_HEADER` |
-| `socketzero.jwtAudience` | Expected JWT audience claim | `"citadel"` | `SOCKETZERO_JWT_AUDIENCE` |
-| `socketzero.jwtIssuer` | Expected JWT issuer claim | `"socketzero"` | `SOCKETZERO_JWT_ISSUER` |
 
 ## LLM Providers
 
@@ -145,7 +133,6 @@ Optional keys:
 - `OKTA_CLIENT_SECRET`
 - `UI_SESSION_SECRET`
 - `REDIS_URL`
-- `SOCKETZERO_JWT_PUBLIC_KEY`
 
 ## Database
 
@@ -202,8 +189,8 @@ For full Bitnami Redis options, see the [Bitnami Redis chart docs](https://githu
 | Parameter | Description | Default |
 |-----------|-------------|---------|
 | `istio.enabled` | Enable Istio VirtualService | `false` |
-| `istio.citadel.gateways` | Istio gateways | `["istio-system/public"]` |
-| `istio.citadel.hosts` | VirtualService hosts | `["citadel.{{ .Values.domain }}"]` |
+| `istio.corveil.gateways` | Istio gateways | `["istio-system/public"]` |
+| `istio.corveil.hosts` | VirtualService hosts | `["corveil.{{ .Values.domain }}"]` |
 | `istio.mtls.mode` | mTLS mode | `STRICT` |
 
 ### NetworkPolicy
@@ -267,9 +254,9 @@ When enabled, creates a NetworkPolicy allowing inbound HTTP (8000), and outbound
 
 | Parameter | Description | Default |
 |-----------|-------------|---------|
-| `extraEnv` | Additional environment variables for the Citadel container | `[]` |
+| `extraEnv` | Additional environment variables for the Corveil container | `[]` |
 | `extraVolumes` | Additional volumes to add to the pod | `[]` |
-| `extraVolumeMounts` | Additional volume mounts for the Citadel container | `[]` |
+| `extraVolumeMounts` | Additional volume mounts for the Corveil container | `[]` |
 
 Example:
 

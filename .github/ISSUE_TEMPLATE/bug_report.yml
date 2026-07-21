@@ -1,5 +1,5 @@
 name: Bug Report
-description: Report a bug with the Citadel Helm chart
+description: Report a bug with the Corveil Helm chart
 labels: ["bug"]
 body:
   - type: input

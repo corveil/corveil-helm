@@ -1,9 +1,9 @@
 apiVersion: v1
 kind: Pod
 metadata:
-  name: "{{ include "citadel.fullname" . }}-test-connection"
+  name: "{{ include "corveil.fullname" . }}-test-connection"
   labels:
-    {{- include "citadel.labels" . | nindent 4 }}
+    {{- include "corveil.labels" . | nindent 4 }}
   annotations:
     "helm.sh/hook": test
 spec:
@@ -14,10 +14,10 @@ spec:
       args:
         - |
           echo "Testing /health endpoint..."
-          wget -qO- {{ include "citadel.fullname" . }}:{{ .Values.service.port }}/health || exit 1
+          wget -qO- {{ include "corveil.fullname" . }}:{{ .Values.service.port }}/health || exit 1
           echo ""
           echo "Testing /health/ready endpoint (verifies DB connectivity)..."
-          wget -qO- {{ include "citadel.fullname" . }}:{{ .Values.service.port }}/health/ready || exit 1
+          wget -qO- {{ include "corveil.fullname" . }}:{{ .Values.service.port }}/health/ready || exit 1
           echo ""
           echo "All health checks passed."
   restartPolicy: Never
