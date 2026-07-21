@@ -74,18 +74,20 @@ If existingSecret is set, use that; otherwise use release-name-secrets.
 {{- end }}
 
 {{/*
-Build the DATABASE_URL.
-When the Bitnami PostgreSQL subchart is enabled, construct the URL from its values.
-Otherwise fall back to externalDatabase.url.
+Migration guards — fail loudly on values keys removed or renamed in chart 1.0.0
+(the Citadel → Corveil rebrand). Included from an always-rendered template so a
+stale override file produces a clear error at template time instead of a silently
+mis-secreted deploy (an ignored `citadel.secretKey` rendering an empty SECRET_KEY).
+See CHANGELOG.md [1.0.0]. Safe to remove after the 1.x line.
 */}}
-{{- define "corveil.databaseUrl" -}}
-{{- if .Values.postgresql.enabled }}
-{{- $host := printf "%s-postgresql" .Release.Name }}
-{{- $port := "5432" }}
-{{- $user := .Values.postgresql.auth.username }}
-{{- $db   := .Values.postgresql.auth.database }}
-{{- printf "postgresql://%s:$(DATABASE_PASSWORD)@%s:%s/%s" $user $host $port $db }}
-{{- else }}
-{{- .Values.externalDatabase.url }}
+{{- define "corveil.migrationGuards" -}}
+{{- if .Values.citadel }}
+{{- fail "chart 1.0.0: the `citadel:` values block was renamed to `corveil:` — migrate your overrides (e.g. citadel.secretKey → corveil.secretKey, citadel.okta.* → corveil.okta.*). See CHANGELOG.md [1.0.0] Upgrade." }}
+{{- end }}
+{{- if and .Values.istio .Values.istio.citadel }}
+{{- fail "chart 1.0.0: the `istio.citadel:` values block was renamed to `istio.corveil:` — migrate your gateways/hosts overrides. See CHANGELOG.md [1.0.0] Upgrade." }}
+{{- end }}
+{{- if .Values.socketzero }}
+{{- fail "chart 1.0.0: the `socketzero:` values block was removed (SocketZero JWT auth is no longer bundled) — remove it from your overrides. See CHANGELOG.md [1.0.0] Removed." }}
 {{- end }}
 {{- end }}

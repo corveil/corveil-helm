@@ -45,6 +45,15 @@ change. See the upgrade note below.
   binary does not consume these, so the block was dropped rather than carried as
   dead config; it can be reintroduced when the app ships SocketZero support.
 
+### Added
+
+- **Migration guards.** The chart now `fail`s at template time with a clear,
+  actionable message if a stale `citadel:` / `istio.citadel:` / `socketzero:`
+  override key is still present, and `corveil.secretKey` is `required` when
+  `existingSecret` is unset. This turns the breaking key rename into a loud error
+  instead of a silently mis-secreted deploy (an ignored `citadel.secretKey`
+  rendering an empty `SECRET_KEY`). Safe to remove after the 1.x line.
+
 ### Upgrade
 
 Because resource names change, an in-place `helm upgrade` will try to replace
