@@ -10,7 +10,7 @@ Complete reference for all `values.yaml` parameters in the Corveil Helm chart.
 | `image.repository` | Container image repository | `ghcr.io/corveil/corveil` | — |
 | `image.pullPolicy` | Image pull policy | `IfNotPresent` | — |
 | `image.tag` | Image tag (defaults to chart `appVersion`) | `""` | — |
-| `nameOverride` | Override the chart name | `""` | — |
+| `nameOverride` | `app.kubernetes.io/name` label value. Changing it on an existing release alters the immutable Deployment selector — see CHANGELOG [1.0.0] Upgrade. | `"corveil"` | — |
 | `fullnameOverride` | Override the full resource name | `"corveil"` | — |
 | `domain` | Base domain for Big Bang integration | `"bigbang.dev"` | — |
 | `imagePullSecrets` | Image pull secrets for private registries | `[]` | — |

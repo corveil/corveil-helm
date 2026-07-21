@@ -31,7 +31,7 @@ Disable for production: --set corveil.devLoginEnabled=false
 
 Next steps — create your first API key:
   1. Open the UI and navigate to API Keys
-  2. Click "Create Key" and copy the generated key (starts with sk-citadel-)
+  2. Click "Create Key" and copy the generated key (starts with {{ .Values.corveil.apiKeyPrefix }}-)
   3. Configure your client:
 
 Configure Claude Code to use Corveil:
