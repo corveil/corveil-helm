@@ -1,16 +1,16 @@
-# Citadel Helm Chart
+# Corveil Helm Chart
 
-Helm chart for [Citadel AI Gateway](https://github.com/radiusmethod/citadel) — a zero-trust AI gateway with spend tracking, guardrails, and OpenAI-compatible API.
+Helm chart for [Corveil AI Gateway](https://github.com/corveil/corveil) — a zero-trust AI gateway with spend tracking, guardrails, and OpenAI-compatible API.
 
 Works as a standalone Kubernetes install **and** as a Big Bang package.
 
 ## Quick Start
 
 ```bash
-helm install citadel oci://ghcr.io/radiusmethod/citadel-helm/citadel-chart \
-  --set citadel.secretKey="$(openssl rand -hex 32)" \
-  --set citadel.environment=development \
-  --set citadel.devLoginEnabled=true \
+helm install corveil oci://ghcr.io/corveil/corveil-helm/corveil-chart \
+  --set corveil.secretKey="$(openssl rand -hex 32)" \
+  --set corveil.environment=development \
+  --set corveil.devLoginEnabled=true \
   --set providers.openrouter.apiKey="sk-or-xxx"
 ```
 
@@ -19,7 +19,7 @@ helm install citadel oci://ghcr.io/radiusmethod/citadel-helm/citadel-chart \
 Port-forward and open the UI:
 
 ```bash
-kubectl port-forward svc/citadel 8000:8000
+kubectl port-forward svc/corveil 8000:8000
 open http://localhost:8000/ui
 ```
 
@@ -40,28 +40,28 @@ Click **Dev Login** to get started immediately — no OIDC setup required.
 
 ### Evaluation Mode
 
-For trying out Citadel before production deployment. Enables the dev login UI so you can create users and API keys without configuring OIDC.
+For trying out Corveil before production deployment. Enables the dev login UI so you can create users and API keys without configuring OIDC.
 
 ```bash
-helm install citadel oci://ghcr.io/radiusmethod/citadel-helm/citadel-chart \
-  --set citadel.secretKey="change-me" \
-  --set citadel.environment=development \
-  --set citadel.devLoginEnabled=true \
+helm install corveil oci://ghcr.io/corveil/corveil-helm/corveil-chart \
+  --set corveil.secretKey="change-me" \
+  --set corveil.environment=development \
+  --set corveil.devLoginEnabled=true \
   --set providers.openrouter.apiKey="sk-or-xxx"
 ```
 
-This deploys Citadel with the bundled PostgreSQL, development mode, and dev login enabled.
+This deploys Corveil with the bundled PostgreSQL, development mode, and dev login enabled.
 
 ### Production (external database)
 
 ```bash
-helm install citadel oci://ghcr.io/radiusmethod/citadel-helm/citadel-chart \
-  --set citadel.secretKey="$(openssl rand -hex 32)" \
-  --set citadel.okta.enabled=true \
-  --set citadel.okta.domain="company.okta.com" \
-  --set citadel.okta.clientId="0oaXXX" \
-  --set citadel.okta.clientSecret="secret" \
-  --set citadel.okta.sessionSecret="$(openssl rand -hex 32)" \
+helm install corveil oci://ghcr.io/corveil/corveil-helm/corveil-chart \
+  --set corveil.secretKey="$(openssl rand -hex 32)" \
+  --set corveil.okta.enabled=true \
+  --set corveil.okta.domain="company.okta.com" \
+  --set corveil.okta.clientId="0oaXXX" \
+  --set corveil.okta.clientSecret="secret" \
+  --set corveil.okta.sessionSecret="$(openssl rand -hex 32)" \
   --set postgresql.enabled=false \
   --set externalDatabase.url="postgresql://user:pass@db-host:5432/citadel" \
   --set providers.openrouter.apiKey="sk-or-xxx"
@@ -72,17 +72,17 @@ helm install citadel oci://ghcr.io/radiusmethod/citadel-helm/citadel-chart \
 ```yaml
 # In your Big Bang values override:
 addons:
-  citadel:
+  corveil:
     enabled: true
     values:
       istio:
         enabled: true
-        citadel:
+        corveil:
           gateways:
             - "istio-system/public"
           hosts:
-            - "citadel.bigbang.dev"
-      citadel:
+            - "corveil.bigbang.dev"
+      corveil:
         secretKey: "change-me"
       providers:
         openrouter:
@@ -94,8 +94,8 @@ addons:
 If you manage secrets externally (Vault, Sealed Secrets, ESO), create a Kubernetes Secret with the expected keys and reference it:
 
 ```bash
-helm install citadel oci://ghcr.io/radiusmethod/citadel-helm/citadel-chart \
-  --set existingSecret=my-citadel-secrets
+helm install corveil oci://ghcr.io/corveil/corveil-helm/corveil-chart \
+  --set existingSecret=my-corveil-secrets
 ```
 
 Required keys in your secret: `DATABASE_URL`, `SECRET_KEY`. Optional: `OPENROUTER_API_KEY`, `ANTHROPIC_API_KEY`, etc.
@@ -104,17 +104,17 @@ Required keys in your secret: `DATABASE_URL`, `SECRET_KEY`. Optional: `OPENROUTE
 
 | Parameter | Description | Default |
 |-----------|-------------|---------|
-| `image.repository` | Container image | `ghcr.io/radiusmethod/citadel` |
+| `image.repository` | Container image | `ghcr.io/corveil/corveil` |
 | `image.tag` | Image tag (defaults to appVersion) | `""` |
-| `citadel.secretKey` | Session signing key (**required**) | `""` |
-| `citadel.environment` | `development`, `staging`, or `production` | `production` |
-| `citadel.devLoginEnabled` | Enable dev login bypass | `false` |
-| `citadel.logLevel` | Log level | `INFO` |
-| `citadel.autoProvisionUsers` | Auto-create users from headers | `true` |
-| `citadel.guardrails.enabled` | Enable guardrails | `true` |
-| `citadel.passthrough.enabled` | Enable API key passthrough | `true` |
-| `citadel.plugins.enabled` | Enable plugin system | `true` |
-| `citadel.okta.enabled` | Enable Okta OIDC | `false` |
+| `corveil.secretKey` | Session signing key (**required**) | `""` |
+| `corveil.environment` | `development`, `staging`, or `production` | `production` |
+| `corveil.devLoginEnabled` | Enable dev login bypass | `false` |
+| `corveil.logLevel` | Log level | `INFO` |
+| `corveil.autoProvisionUsers` | Auto-create users from headers | `true` |
+| `corveil.guardrails.enabled` | Enable guardrails | `true` |
+| `corveil.passthrough.enabled` | Enable API key passthrough | `true` |
+| `corveil.plugins.enabled` | Enable plugin system | `true` |
+| `corveil.okta.enabled` | Enable Okta OIDC | `false` |
 | `providers.openrouter.apiKey` | OpenRouter API key | `""` |
 | `providers.anthropic.apiKey` | Anthropic API key | `""` |
 | `providers.vertexai.projectId` | GCP project ID | `""` |
@@ -135,7 +135,7 @@ For the complete configuration reference, see [docs/CONFIGURATION.md](docs/CONFI
 ### Claude Code
 
 ```bash
-claude config set --global apiBaseUrl http://<citadel-host>:8000/v1
+claude config set --global apiBaseUrl http://<corveil-host>:8000/v1
 ```
 
 ### OpenAI SDK / Python
@@ -143,16 +143,16 @@ claude config set --global apiBaseUrl http://<citadel-host>:8000/v1
 ```python
 from openai import OpenAI
 client = OpenAI(
-    base_url="http://<citadel-host>:8000/v1",
-    api_key="<your-citadel-api-key>",
+    base_url="http://<corveil-host>:8000/v1",
+    api_key="<your-corveil-api-key>",
 )
 ```
 
 ### curl
 
 ```bash
-curl http://<citadel-host>:8000/v1/chat/completions \
-  -H "Authorization: Bearer <your-citadel-api-key>" \
+curl http://<corveil-host>:8000/v1/chat/completions \
+  -H "Authorization: Bearer <your-corveil-api-key>" \
   -H "Content-Type: application/json" \
   -d '{"model": "or-claude-sonnet-4.5 [EXTERNAL]", "messages": [{"role": "user", "content": "Hello"}]}'
 ```
@@ -166,13 +166,13 @@ The migration runner is idempotent and tracks state in a `schema_migrations` tab
 ## Uninstall
 
 ```bash
-helm uninstall citadel
+helm uninstall corveil
 ```
 
 Note: The bundled PostgreSQL PVC is **not** deleted automatically. To fully clean up:
 
 ```bash
-kubectl delete pvc data-citadel-postgresql-0
+kubectl delete pvc data-corveil-postgresql-0
 ```
 
 ## License

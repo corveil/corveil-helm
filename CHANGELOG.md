@@ -1,9 +1,58 @@
 # Changelog
 
-All notable changes to the Citadel Helm chart will be documented in this file.
+All notable changes to the Corveil Helm chart will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [1.0.0] - 2026-07-21
+
+Rebrands the chart identity from **Citadel** to **Corveil**. This is a breaking
+change: the chart name, rendered resource names, and user-facing values keys all
+change. See the upgrade note below.
+
+> ⚠️ **On-the-wire / auth contract is intentionally unchanged.** The Corveil app
+> still speaks `citadel` on the wire, so these are **kept as-is**: the
+> `apiKeyPrefix` default `sk-citadel`, the `x-citadel-api-key` passthrough header,
+> every rendered environment-variable **name** (`API_KEY_PREFIX`, `SECRET_KEY`,
+> `SOCKETZERO_JWT_AUDIENCE`, …), and the bundled PostgreSQL `database` /
+> `username` / `password` defaults (`citadel`). `helm template` renders the exact
+> same env-var keys the app reads.
+
+### Changed (BREAKING)
+
+- **Chart name**: `citadel-chart` → `corveil-chart`. The published OCI artifact
+  moves to `oci://ghcr.io/corveil/corveil-helm/corveil-chart`.
+- **`fullnameOverride`**: `"citadel"` → `"corveil"`. Rendered resource names
+  (Deployment, Service, ServiceAccount, Secret, ConfigMap, HPA, PDB,
+  NetworkPolicy, VirtualService, test pod) change from `citadel*` to `corveil*`.
+- **Values block key**: top-level `citadel:` → `corveil:`. Every override keyed
+  under `citadel:` moves accordingly (e.g. `citadel.secretKey` →
+  `corveil.secretKey`, `citadel.okta.*` → `corveil.okta.*`).
+- **Istio block key**: `istio.citadel:` → `istio.corveil:` (gateways/hosts).
+- **Template helpers**: `citadel.*` named templates → `corveil.*`.
+- **`image.repository`**: `ghcr.io/radiusmethod/citadel` → `ghcr.io/corveil/corveil`.
+  The Corveil app image now publishes to the `corveil` GHCR org.
+- **`socketzero.jwtAudience`** default: `"citadel"` → `"corveil"`, matching the
+  Corveil app's `SOCKETZERO_JWT_AUDIENCE` default.
+- **`appVersion`**: `0.2.1` → `0.3.4`, tracking the current Corveil app release.
+- **Branding**: README, docs, `LICENSE` (© 2026 Corveil, Inc.), `SECURITY.md`,
+  `CONTRIBUTING.md`, `CODEOWNERS`, and issue templates repointed to
+  `corveil/corveil-helm` / `corveil/corveil` / Corveil.
+
+### Upgrade
+
+Because resource names change, an in-place `helm upgrade` will try to replace
+resources. Recommended path:
+
+1. Migrate `values.yaml` overrides: `citadel:` → `corveil:` and
+   `istio.citadel:` → `istio.corveil:`. Env-var **names** are unchanged.
+2. Update the install source to
+   `oci://ghcr.io/corveil/corveil-helm/corveil-chart`.
+3. Either reinstall fresh as the `corveil` release, or set
+   `--set fullnameOverride=citadel` to keep the old resource names during the
+   transition. The bundled-PostgreSQL PVC (`data-<release>-postgresql-0`) is not
+   renamed by this change.
 
 ## [0.2.1] - 2026-03-08
 

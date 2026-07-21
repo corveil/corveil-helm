@@ -1,10 +1,10 @@
 # Architecture Overview
 
-This document describes the Citadel AI Gateway architecture for operators and platform engineers deploying the system.
+This document describes the Corveil AI Gateway architecture for operators and platform engineers deploying the system.
 
-## What is Citadel?
+## What is Corveil?
 
-Citadel is a zero-trust AI gateway that sits between your users (developers using Claude Code, OpenAI SDK, etc.) and LLM providers (OpenRouter, Anthropic, Vertex AI, AWS Bedrock). It provides:
+Corveil is a zero-trust AI gateway that sits between your users (developers using Claude Code, OpenAI SDK, etc.) and LLM providers (OpenRouter, Anthropic, Vertex AI, AWS Bedrock). It provides:
 
 - **Centralized API key management** — Users get virtual API keys; real provider keys stay in the gateway
 - **Spend tracking and budget enforcement** — Per-user and per-key cost monitoring with configurable limits
@@ -17,7 +17,7 @@ Citadel is a zero-trust AI gateway that sits between your users (developers usin
 
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
-│                          CITADEL GATEWAY                              │
+│                          CORVEIL GATEWAY                              │
 ├──────────────────────────────────────────────────────────────────────┤
 │                                                                       │
 │   Client Request (Claude Code / OpenAI SDK / curl)                   │
@@ -113,9 +113,9 @@ Citadel is a zero-trust AI gateway that sits between your users (developers usin
 
 ## Authentication Chain
 
-Citadel supports multiple authentication methods, evaluated in priority order:
+Corveil supports multiple authentication methods, evaluated in priority order:
 
-1. **Passthrough** — If `x-citadel-api-key` header is present and passthrough is enabled, the client's `Authorization` header is forwarded to the upstream provider. The Citadel key is used for logging and budget tracking.
+1. **Passthrough** — If `x-citadel-api-key` header is present and passthrough is enabled, the client's `Authorization` header is forwarded to the upstream provider. The Corveil key is used for logging and budget tracking.
 
 2. **SocketZero JWT** — If enabled, verifies RS256-signed JWTs from SocketZero Receiver. Users are auto-provisioned on first auth.
 
@@ -127,7 +127,7 @@ Citadel supports multiple authentication methods, evaluated in priority order:
 
 ## Database Schema
 
-Citadel uses PostgreSQL with four core tables:
+Corveil uses PostgreSQL with four core tables:
 
 ### users
 
@@ -195,7 +195,7 @@ Models are curated via `models.yaml` (ConfigMap). When `model_curation_enabled: 
 
 ## Plugin System
 
-Citadel has an extensible plugin system with lifecycle hooks:
+Corveil has an extensible plugin system with lifecycle hooks:
 
 ```
 Auth → PRE_REQUEST → CHECK_INPUT → PRE_PROVIDER → Provider Call
@@ -242,7 +242,7 @@ The chart creates these resources:
 
 | Resource | Condition | Purpose |
 |----------|-----------|---------|
-| Deployment | Always | Citadel application pods |
+| Deployment | Always | Corveil application pods |
 | Service (ClusterIP) | Always | Internal service |
 | ConfigMap (`-env`) | Always | Non-sensitive environment variables |
 | ConfigMap (`-models`) | Always | Models configuration |

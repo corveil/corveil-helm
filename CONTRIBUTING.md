@@ -1,6 +1,6 @@
-# Contributing to Citadel Helm Chart
+# Contributing to Corveil Helm Chart
 
-Thank you for your interest in contributing to the Citadel Helm chart.
+Thank you for your interest in contributing to the Corveil Helm chart.
 
 ## Getting Started
 
@@ -14,8 +14,8 @@ Thank you for your interest in contributing to the Citadel Helm chart.
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/radiusmethod/citadel-helm.git
-   cd citadel-helm
+   git clone https://github.com/corveil/corveil-helm.git
+   cd corveil-helm
    ```
 
 2. Update chart dependencies:
@@ -35,7 +35,7 @@ Thank you for your interest in contributing to the Citadel Helm chart.
 
 ## Bug Reports
 
-Open a [GitHub issue](https://github.com/radiusmethod/citadel-helm/issues/new) with:
+Open a [GitHub issue](https://github.com/corveil/corveil-helm/issues/new) with:
 
 - Chart version and Kubernetes version
 - `values.yaml` overrides used (redact secrets)

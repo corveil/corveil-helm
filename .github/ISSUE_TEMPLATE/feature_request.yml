@@ -1,5 +1,5 @@
 name: Feature Request
-description: Suggest a new feature or improvement for the Citadel Helm chart
+description: Suggest a new feature or improvement for the Corveil Helm chart
 labels: ["enhancement"]
 body:
   - type: textarea

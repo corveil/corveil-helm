@@ -1,8 +1,8 @@
-Citadel AI Gateway has been deployed!
+Corveil AI Gateway has been deployed!
 
 {{- if .Values.ingress.enabled }}
 
-Access Citadel at:
+Access Corveil at:
 {{- range .Values.ingress.hosts }}
   http{{ if $.Values.ingress.tls }}s{{ end }}://{{ .host }}
 {{- end }}
@@ -10,23 +10,23 @@ Access Citadel at:
 {{- else if contains "NodePort" .Values.service.type }}
 
 Get the application URL:
-  export NODE_PORT=$(kubectl get --namespace {{ .Release.Namespace }} -o jsonpath="{.spec.ports[0].nodePort}" services {{ include "citadel.fullname" . }})
+  export NODE_PORT=$(kubectl get --namespace {{ .Release.Namespace }} -o jsonpath="{.spec.ports[0].nodePort}" services {{ include "corveil.fullname" . }})
   export NODE_IP=$(kubectl get nodes --namespace {{ .Release.Namespace }} -o jsonpath="{.items[0].status.addresses[0].address}")
   echo http://$NODE_IP:$NODE_PORT
 
 {{- else if contains "ClusterIP" .Values.service.type }}
 
 Port-forward to access the UI:
-  kubectl --namespace {{ .Release.Namespace }} port-forward svc/{{ include "citadel.fullname" . }} 8000:{{ .Values.service.port }}
+  kubectl --namespace {{ .Release.Namespace }} port-forward svc/{{ include "corveil.fullname" . }} 8000:{{ .Values.service.port }}
 
 Then open: http://localhost:8000/ui
 
 {{- end }}
 
-{{- if .Values.citadel.devLoginEnabled }}
+{{- if .Values.corveil.devLoginEnabled }}
 
 Dev login is ENABLED. Click "Dev Login" on the UI to get started.
-Disable for production: --set citadel.devLoginEnabled=false
+Disable for production: --set corveil.devLoginEnabled=false
 {{- end }}
 
 Next steps — create your first API key:
@@ -34,12 +34,12 @@ Next steps — create your first API key:
   2. Click "Create Key" and copy the generated key (starts with sk-citadel-)
   3. Configure your client:
 
-Configure Claude Code to use Citadel:
+Configure Claude Code to use Corveil:
   claude config set --global apiBaseUrl http://localhost:8000/v1
 
 Configure OpenAI-compatible clients:
   export OPENAI_API_BASE=http://localhost:8000/v1
-  export OPENAI_API_KEY=<your-citadel-api-key>
+  export OPENAI_API_KEY=<your-corveil-api-key>
 
 {{- if .Values.postgresql.enabled }}
 

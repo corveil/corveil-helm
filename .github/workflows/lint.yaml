@@ -18,13 +18,13 @@ jobs:
         run: helm dependency build .
 
       - name: Helm lint
-        run: helm lint . --set citadel.secretKey=test
+        run: helm lint . --set corveil.secretKey=test
 
       - name: Helm template
-        run: helm template citadel . --set citadel.secretKey=test
+        run: helm template corveil . --set corveil.secretKey=test
 
       - name: Render templates for kubelinter
-        run: helm template citadel . --set citadel.secretKey=test --output-dir rendered
+        run: helm template corveil . --set corveil.secretKey=test --output-dir rendered
 
       - name: Install kubelinter
         run: |
@@ -33,4 +33,4 @@ jobs:
           sudo mv kube-linter-linux /usr/local/bin/kube-linter
 
       - name: Run kubelinter
-        run: kube-linter lint rendered/citadel-chart/templates/
+        run: kube-linter lint rendered/corveil-chart/templates/

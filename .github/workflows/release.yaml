@@ -38,4 +38,4 @@ jobs:
         run: helm package .
 
       - name: Push chart to GHCR
-        run: helm push citadel-chart-${{ steps.version.outputs.version }}.tgz oci://ghcr.io/radiusmethod/citadel-helm
+        run: helm push corveil-chart-${{ steps.version.outputs.version }}.tgz oci://ghcr.io/corveil/corveil-helm
