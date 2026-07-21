@@ -117,13 +117,11 @@ Corveil supports multiple authentication methods, evaluated in priority order:
 
 1. **Passthrough** — If `x-citadel-api-key` header is present and passthrough is enabled, the client's `Authorization` header is forwarded to the upstream provider. The Corveil key is used for logging and budget tracking.
 
-2. **SocketZero JWT** — If enabled, verifies RS256-signed JWTs from SocketZero Receiver. Users are auto-provisioned on first auth.
+2. **API Key** — Traditional `sk-citadel-xxx` virtual API keys. Keys are SHA-256 hashed before storage.
 
-3. **API Key** — Traditional `sk-citadel-xxx` virtual API keys. Keys are SHA-256 hashed before storage.
+3. **OIDC (Okta)** — For the management UI. Users authenticate via Okta and get session cookies.
 
-4. **OIDC (Okta)** — For the management UI. Users authenticate via Okta and get session cookies.
-
-5. **Dev Login** — Bypass authentication for evaluation. Must be explicitly enabled.
+4. **Dev Login** — Bypass authentication for evaluation. Must be explicitly enabled.
 
 ## Database Schema
 

@@ -15,7 +15,7 @@ change. See the upgrade note below.
 > still speaks `citadel` on the wire, so these are **kept as-is**: the
 > `apiKeyPrefix` default `sk-citadel`, the `x-citadel-api-key` passthrough header,
 > every rendered environment-variable **name** (`API_KEY_PREFIX`, `SECRET_KEY`,
-> `SOCKETZERO_JWT_AUDIENCE`, …), and the bundled PostgreSQL `database` /
+> `ENVIRONMENT`, …), and the bundled PostgreSQL `database` /
 > `username` / `password` defaults (`citadel`). `helm template` renders the exact
 > same env-var keys the app reads.
 
@@ -33,12 +33,17 @@ change. See the upgrade note below.
 - **Template helpers**: `citadel.*` named templates → `corveil.*`.
 - **`image.repository`**: `ghcr.io/radiusmethod/citadel` → `ghcr.io/corveil/corveil`.
   The Corveil app image now publishes to the `corveil` GHCR org.
-- **`socketzero.jwtAudience`** default: `"citadel"` → `"corveil"`, matching the
-  Corveil app's `SOCKETZERO_JWT_AUDIENCE` default.
 - **`appVersion`**: `0.2.1` → `0.3.4`, tracking the current Corveil app release.
 - **Branding**: README, docs, `LICENSE` (© 2026 Corveil, Inc.), `SECURITY.md`,
   `CONTRIBUTING.md`, `CODEOWNERS`, and issue templates repointed to
   `corveil/corveil-helm` / `corveil/corveil` / Corveil.
+
+### Removed
+
+- **SocketZero JWT authentication** (`socketzero.*` values and the
+  `TRUST_SOCKETZERO_JWT` / `SOCKETZERO_JWT_*` env vars). The current Corveil app
+  binary does not consume these, so the block was dropped rather than carried as
+  dead config; it can be reintroduced when the app ships SocketZero support.
 
 ### Upgrade
 

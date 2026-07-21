@@ -78,18 +78,6 @@ Rate limits can also be set per-key when creating API keys via the management AP
 
 Enabling body logging significantly increases storage usage but provides a full audit trail.
 
-## SocketZero JWT Authentication
-
-Keyless authentication via signed JWTs from SocketZero Receiver.
-
-| Parameter | Description | Default | Env Var |
-|-----------|-------------|---------|---------|
-| `socketzero.enabled` | Enable SocketZero JWT authentication | `false` | `TRUST_SOCKETZERO_JWT` |
-| `socketzero.jwtPublicKey` | PEM-encoded RS256 public key for JWT verification | `""` | `SOCKETZERO_JWT_PUBLIC_KEY` |
-| `socketzero.jwtHeader` | HTTP header containing the JWT | `"X-SocketZero-Jwt-Assertion"` | `SOCKETZERO_JWT_HEADER` |
-| `socketzero.jwtAudience` | Expected JWT audience claim | `"corveil"` | `SOCKETZERO_JWT_AUDIENCE` |
-| `socketzero.jwtIssuer` | Expected JWT issuer claim | `"socketzero"` | `SOCKETZERO_JWT_ISSUER` |
-
 ## LLM Providers
 
 ### OpenRouter
@@ -145,7 +133,6 @@ Optional keys:
 - `OKTA_CLIENT_SECRET`
 - `UI_SESSION_SECRET`
 - `REDIS_URL`
-- `SOCKETZERO_JWT_PUBLIC_KEY`
 
 ## Database
 

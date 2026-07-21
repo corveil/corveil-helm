@@ -51,14 +51,6 @@ logging:
   requestBody: true
   responseBody: true
 
-# -- SocketZero JWT authentication (keyless)
-socketzero:
-  enabled: false
-  jwtPublicKey: ""
-  jwtHeader: "X-SocketZero-Jwt-Assertion"
-  jwtAudience: "corveil"
-  jwtIssuer: "socketzero"
-
 # -- LLM Provider API keys
 providers:
   openrouter:
