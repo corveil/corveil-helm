@@ -26,6 +26,11 @@ change. See the upgrade note below.
 - **`fullnameOverride`**: `"citadel"` → `"corveil"`. Rendered resource names
   (Deployment, Service, ServiceAccount, Secret, ConfigMap, HPA, PDB,
   NetworkPolicy, VirtualService, test pod) change from `citadel*` to `corveil*`.
+- **`nameOverride`**: `""` → `"corveil"`, so the `app.kubernetes.io/name` selector
+  label is now `corveil` (was `citadel-chart`, i.e. `.Chart.Name`). This aligns the
+  label with the resource names and with the `kubectl -l app.kubernetes.io/name=corveil`
+  commands in the docs. Being a selector-label change, it carries the same
+  immutable-selector caveat on in-place upgrades — see the Upgrade note.
 - **Values block key**: top-level `citadel:` → `corveil:`. Every override keyed
   under `citadel:` moves accordingly (e.g. `citadel.secretKey` →
   `corveil.secretKey`, `citadel.okta.*` → `corveil.okta.*`).
@@ -44,6 +49,8 @@ change. See the upgrade note below.
   `TRUST_SOCKETZERO_JWT` / `SOCKETZERO_JWT_*` env vars). The current Corveil app
   binary does not consume these, so the block was dropped rather than carried as
   dead config; it can be reintroduced when the app ships SocketZero support.
+- **Dead `corveil.databaseUrl` template helper** (unused; `DATABASE_URL` is built
+  inline in the Secret).
 
 ### Added
 
@@ -63,10 +70,16 @@ resources. Recommended path:
    `istio.citadel:` → `istio.corveil:`. Env-var **names** are unchanged.
 2. Update the install source to
    `oci://ghcr.io/corveil/corveil-helm/corveil-chart`.
-3. Either reinstall fresh as the `corveil` release, or set
-   `--set fullnameOverride=citadel` to keep the old resource names during the
-   transition. The bundled-PostgreSQL PVC (`data-<release>-postgresql-0`) is not
-   renamed by this change.
+3. Either **reinstall fresh** as the `corveil` release (recommended — the name
+   change makes Helm create new resources and remove the old ones), **or** for an
+   in-place `helm upgrade`, pin *both* old identifiers so the immutable Deployment
+   selector does not change:
+   `--set fullnameOverride=citadel --set nameOverride=citadel-chart`.
+   `fullnameOverride` keeps the old resource names; `nameOverride` keeps the old
+   `app.kubernetes.io/name: citadel-chart` selector label. Omitting `nameOverride`
+   flips that label and `helm upgrade` fails with `field is immutable`. The
+   bundled-PostgreSQL PVC (`data-<release>-postgresql-0`) is not renamed by this
+   change.
 
 ## [0.2.1] - 2026-03-08
 
