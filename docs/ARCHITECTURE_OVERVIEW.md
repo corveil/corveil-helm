@@ -1,261 +1,146 @@
 # Architecture Overview
 
-This document describes the Corveil AI Gateway architecture for operators and platform engineers deploying the system.
+This document describes how Corveil runs on Kubernetes, for the operators and platform
+engineers who deploy it with this chart. It covers Corveil v0.5 and chart 2.x.
 
 ## What is Corveil?
 
-Corveil is a zero-trust AI gateway that sits between your users (developers using Claude Code, OpenAI SDK, etc.) and LLM providers (OpenRouter, Anthropic, Vertex AI, AWS Bedrock). It provides:
+Corveil sits between your people and agents (Claude Code, OpenAI- and Anthropic-compatible
+clients, Crow) and the LLM providers they use. It also builds an organizational knowledge
+graph from the tools your teams work in.
 
-- **Centralized API key management** — Users get virtual API keys; real provider keys stay in the gateway
-- **Spend tracking and budget enforcement** — Per-user and per-key cost monitoring with configurable limits
-- **Guardrails** — Input/output content filtering (PII detection, moderation, custom plugins)
-- **Audit logging** — Full request/response logging for compliance
-- **Model curation** — Control which models are available to users
-- **OpenAI-compatible API** — Drop-in replacement for OpenAI/Anthropic API endpoints
+- **AI gateway**: virtual API keys, so real provider keys stay in Corveil; per-org model
+  catalogs, budgets, spend tracking and rate limits; guardrails on input and output; request
+  logs and an audit trail. It speaks the OpenAI (`/v1/chat/completions`) and Anthropic
+  (`/v1/messages`) APIs.
+- **Knowledge layer**: sensors pull events from GitHub, Jira, Slack, Google Workspace,
+  Microsoft 365, a mounted folder and more. The ontology turns them into entities and links that
+  people query from the UI, the `corveil` CLI and MCP.
+- **Control plane**: everything the admin UI does is also available as REST, as the
+  `corveil control` CLI, and as MCP `control_*` tools.
 
-## Request Flow
-
-```
-┌──────────────────────────────────────────────────────────────────────┐
-│                          CORVEIL GATEWAY                              │
-├──────────────────────────────────────────────────────────────────────┤
-│                                                                       │
-│   Client Request (Claude Code / OpenAI SDK / curl)                   │
-│        │                                                              │
-│        ▼                                                              │
-│   ┌─────────────┐     ┌─────────────┐     ┌─────────────┐           │
-│   │  Security   │────▶│    Auth     │────▶│  Guardrails │           │
-│   │  Headers    │     │  (API Key / │     │  (Pre-call) │           │
-│   └─────────────┘     │  JWT/OIDC)  │     └─────────────┘           │
-│                        └─────────────┘           │                   │
-│                              │                   ▼                   │
-│                        ┌─────────────┐     ┌─────────────┐          │
-│                        │   Budget    │     │  Provider   │          │
-│                        │   Check     │     │  Router     │          │
-│                        └─────────────┘     └─────────────┘          │
-│                                                  │                   │
-│                    ┌─────────────────────────────┼──────────┐       │
-│                    ▼                             ▼           ▼       │
-│             ┌───────────┐              ┌───────────┐  ┌──────────┐ │
-│             │ OpenRouter │              │ Vertex AI │  │ Bedrock  │ │
-│             └───────────┘              └───────────┘  └──────────┘ │
-│                    │                             │           │       │
-│                    └─────────────────────────────┼───────────┘       │
-│                                                  ▼                   │
-│                                          ┌───────────┐              │
-│                                          │ Guardrails│              │
-│                                          │(Post-call)│              │
-│                                          └───────────┘              │
-│                                                  │                   │
-│   ┌─────────────┐     ┌─────────────┐     ┌─────────────┐          │
-│   │  Logging    │◀────│   Spend     │◀────│  Response   │          │
-│   │  (Async)    │     │  Tracking   │     │  Transform  │          │
-│   └─────────────┘     └─────────────┘     └─────────────┘          │
-│         │                   │                                        │
-│         ▼                   ▼                                        │
-│   ┌──────────────────────────────────┐                               │
-│   │          PostgreSQL              │                               │
-│   │  (Keys, Users, Logs, Spend)     │                               │
-│   └──────────────────────────────────┘                               │
-│                                                                       │
-└──────────────────────────────────────────────────────────────────────┘
-```
-
-## API Endpoints
-
-### LLM Endpoints (OpenAI-Compatible)
-
-| Method | Path | Description |
-|--------|------|-------------|
-| POST | `/v1/chat/completions` | Chat completion (streaming and non-streaming) |
-| GET | `/v1/models` | List available models |
-
-### LLM Endpoints (Anthropic-Compatible)
-
-| Method | Path | Description |
-|--------|------|-------------|
-| POST | `/v1/messages` | Anthropic Messages API (streaming, thinking, caching) |
-| POST | `/v1/messages/count_tokens` | Count tokens for a messages request |
-
-### Management API
-
-| Method | Path | Description |
-|--------|------|-------------|
-| POST | `/api/keys` | Create virtual API key |
-| GET | `/api/keys` | List user's keys |
-| GET | `/api/keys/{id}` | Get key details |
-| DELETE | `/api/keys/{id}` | Revoke key |
-| GET | `/api/keys/{id}/usage` | Key usage stats |
-| POST | `/api/users` | Create user |
-| GET | `/api/users` | List users |
-| GET | `/api/users/{id}` | User details |
-| PATCH | `/api/users/{id}` | Update user |
-| DELETE | `/api/users/{id}` | Deactivate user |
-| GET | `/api/users/{id}/usage` | User usage stats |
-
-### Plugin API
-
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/api/plugins` | List plugins |
-| POST | `/api/plugins` | Register plugin |
-| PATCH | `/api/plugins/{id}` | Update plugin config |
-| POST | `/api/plugins/{id}/enable` | Enable plugin |
-| POST | `/api/plugins/{id}/disable` | Disable plugin |
-| POST | `/api/plugins/reload` | Reload all plugins |
-
-### Health Endpoints
-
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/health` | Liveness probe |
-| GET | `/health/ready` | Readiness probe (checks DB connectivity) |
-
-## Authentication Chain
-
-Corveil supports multiple authentication methods, evaluated in priority order:
-
-1. **Passthrough** — If `x-citadel-api-key` header is present and passthrough is enabled, the client's `Authorization` header is forwarded to the upstream provider. The Corveil key is used for logging and budget tracking.
-
-2. **API Key** — Traditional `sk-citadel-xxx` virtual API keys. Keys are SHA-256 hashed before storage.
-
-3. **OIDC (Okta)** — For the management UI. Users authenticate via Okta and get session cookies.
-
-4. **Dev Login** — Bypass authentication for evaluation. Must be explicitly enabled.
-
-## Database Schema
-
-Corveil uses PostgreSQL with four core tables:
-
-### users
-
-Stores user accounts with spend tracking and budget limits.
-
-| Column | Type | Description |
-|--------|------|-------------|
-| `id` | UUID | Primary key |
-| `email` | VARCHAR | Unique email |
-| `name` | VARCHAR | Display name |
-| `max_budget` | DECIMAL | Spending limit |
-| `spend` | DECIMAL | Current spend |
-| `is_active` | BOOLEAN | Account status |
-| `source` | VARCHAR | How user was created (api_key, socketzero, admin) |
-
-### api_keys
-
-Virtual API keys with per-key budgets and model restrictions.
-
-| Column | Type | Description |
-|--------|------|-------------|
-| `id` | UUID | Primary key |
-| `key_hash` | VARCHAR | SHA-256 hash of the key |
-| `key_prefix` | VARCHAR | First 20 chars for identification |
-| `user_id` | UUID | Owner reference |
-| `max_budget` | DECIMAL | Per-key spending limit |
-| `allowed_models` | TEXT[] | Model whitelist (NULL = all) |
-| `rate_limit_rpm` | INTEGER | Requests per minute |
-| `rate_limit_tpm` | INTEGER | Tokens per minute |
-| `expires_at` | TIMESTAMPTZ | Key expiration |
-
-### request_logs
-
-Audit trail of all LLM requests.
-
-| Column | Type | Description |
-|--------|------|-------------|
-| `id` | UUID | Primary key |
-| `request_id` | VARCHAR | Correlation ID |
-| `api_key_id` | UUID | Key used |
-| `model` | VARCHAR | Model requested |
-| `provider` | VARCHAR | Provider used |
-| `prompt_tokens` | INTEGER | Input tokens |
-| `completion_tokens` | INTEGER | Output tokens |
-| `cost` | DECIMAL | Request cost |
-| `latency_ms` | INTEGER | Response time |
-| `status` | VARCHAR | success, error, guardrail_blocked |
-
-### daily_spend
-
-Pre-aggregated daily spend for fast dashboard queries.
-
-## Provider Routing
-
-The provider router maps model names from `models.yaml` to upstream providers:
-
-| Provider | Transport | Authentication | Notes |
-|----------|-----------|---------------|-------|
-| **OpenRouter** | HTTPS REST | API key in header | 200+ models, cost in response |
-| **Anthropic** | HTTPS REST | API key in header | Native Messages API passthrough |
-| **Vertex AI** | HTTPS REST | Service account JSON | Google Cloud Gemini models |
-| **Bedrock** | AWS SDK (SigV4) | IAM credentials or task role | GovCloud support |
-
-Models are curated via `models.yaml` (ConfigMap). When `model_curation_enabled: true`, only listed models are available. Set `fallback_to_dynamic: true` to allow unlisted models.
-
-## Plugin System
-
-Corveil has an extensible plugin system with lifecycle hooks:
+## Workloads
 
 ```
-Auth → PRE_REQUEST → CHECK_INPUT → PRE_PROVIDER → Provider Call
-                                                       ↓
-POST_REQUEST ← Spend/Log ← CHECK_OUTPUT ← POST_PROVIDER
+                    Ingress / Istio
+                          │
+                          ▼
+              ┌───────────────────────┐        clients: Claude Code, SDKs, UI,
+              │  api  (Deployment)    │◀────── corveil CLI, MCP
+              │  corveil serve :8000  │
+              │  /v1  /api  /ui  /mcp │
+              │  migrations at boot   │
+              └──────────┬────────────┘
+                         │                      LLM providers / sensor sources
+┌──────────────────────┐ │ ┌─────────────────────────┐        ▲
+│ workers (Deployment) │ │ │ system jobs (CronJobs)  │        │ HTTPS
+│ corveil workers      │ │ │ corveil system-job <x>  │────────┤
+│ sensors, ontology,   │ │ │ retention, catalog and  │        │
+│ sessions, queue      │ │ │ pricing sync, graph     │        │
+│ health :8081         │ │ │ maintenance             │        │
+└─────────┬────────────┘ │ └────────────┬────────────┘        │
+          │              ▼              │                     │
+          │   ┌──────────────────────┐  │                     │
+          └──▶│ PostgreSQL + pgvector│◀─┘    (workers and api also call out)
+              │ corveil_app (RLS)    │
+              │ corveil_system       │
+              └──────────────────────┘
 ```
 
-Built-in plugins:
+| Workload | Scaling | Notes |
+|----------|---------|-------|
+| **api** | Horizontal (`api.replicaCount`, HPA) | Stateless. The UI is compiled into the binary, so there is no Node sidecar and no CDN dependency. Runs migrations at startup under an advisory lock. |
+| **workers** | One replica | Scheduled loops take a database leader lock. Uses `Recreate` on upgrade. Exits while the schema is behind its build. |
+| **system jobs** | One CronJob per job | Each run starts the binary, runs one job against the system database pool, and exits. |
 
-| Plugin | Hooks | Description |
-|--------|-------|-------------|
-| WebhookNotifier | POST_REQUEST, ON_ERROR | Send request events to external webhooks |
-| Anonymizer | PRE_PROVIDER, POST_PROVIDER | Redact PII before sending to provider |
-| CostAlerter | POST_REQUEST | Alert when spend exceeds thresholds |
-| JailbreakDetector | CHECK_INPUT | Detect prompt injection attempts |
+All state lives in PostgreSQL. Nothing needs Redis or a shared filesystem. The one exception
+is the optional filesystem sensor's mounted volume.
 
-Existing guardrails (OpenAI Moderation, PII Filter) are automatically wrapped via `GuardrailPluginAdapter` and participate in the plugin lifecycle.
+## Database and tenant isolation
 
-## Security Model
+Corveil isolates organizations with PostgreSQL row-level security (RLS). Each workload
+connects as a role that matches what it does:
 
-### Data Protection
+| Role | DSN | Can |
+|------|-----|-----|
+| `corveil` (owner) | `DATABASE_URL_PRIVILEGED` | Own the schema; run migrations |
+| `corveil_app` | `DATABASE_URL` | Read and write one org's rows per transaction (NOBYPASSRLS) |
+| `corveil_system` | `DATABASE_URL_SYSTEM` | Cross-org reads and sweeps (BYPASSRLS): sign-in, staff views, system jobs |
 
-- API keys are SHA-256 hashed before storage — plaintext keys are never persisted
-- All provider credentials stay in the gateway — users never see real API keys
-- Security headers on all responses (X-Content-Type-Options, X-Frame-Options, HSTS, CSP)
-- FIPS 140-2 compatible cryptographic operations
+Outside `development`, the api and workers refuse to start without the system pool. The
+bundled evaluation database creates the same three roles on first boot. See
+[CONFIGURATION.md](CONFIGURATION.md#database-roles) for the SQL.
 
-### Network Security
+## Request flow (gateway)
 
-When `networkPolicy.enabled: true`, the chart creates a NetworkPolicy allowing:
+```
+client ──▶ auth (API key, or session + allowed origin)
+       ──▶ org + key policy: model allowlist, budgets, rate limits
+       ──▶ input guardrails
+       ──▶ provider router (org credential, or deployment-wide key) ──▶ provider
+       ◀── output guardrails, spend accounting, request log
+```
 
-- **Ingress**: HTTP (port 8000) from any source
-- **Egress**: DNS (53), PostgreSQL (5432), Redis (6379), HTTPS (443) for LLM APIs
+Passthrough mode forwards the client's own provider credential (`Authorization`) and
+authenticates to Corveil with `x-citadel-api-key`, so a Claude subscription can run through
+Corveil's logging and guardrails.
 
-### Rate Limiting
+## Endpoints
 
-- Default per-key limits: 60 RPM, 100,000 TPM
-- Per-key overrides via the management API
-- Redis required for distributed rate limiting across replicas
+| Path | What |
+|------|------|
+| `POST /v1/chat/completions`, `GET /v1/models` | OpenAI-compatible gateway |
+| `POST /v1/messages`, `POST /v1/messages/count_tokens` | Anthropic-compatible gateway |
+| `/api/*` | REST API behind the UI and the `corveil control` CLI (`corveil control openapi` prints the spec) |
+| `/mcp` | MCP: `ontology_*` and `control_*` tools |
+| `/ui` | Web UI |
+| `GET /health` | Liveness. Reports status and build version. |
+| `GET /health/ready` | Readiness: database, schema version, guardrails |
+| workers `GET :8081/health` | Workers liveness. 503 if a worker loop has stalled. |
 
-## Kubernetes Resources
+## Authentication
 
-The chart creates these resources:
+- **API keys** (`sk-citadel-…`, SHA-256 hashed at rest) authenticate gateway, CLI and MCP
+  traffic in every mode.
+- **UI sign-in** is WorkOS in production. Dev login (`DEV_AUTH`) is for evaluation and
+  only works with `ENVIRONMENT=development`.
+- **Offline license** (optional): a signed license, verified at boot by the api and workers,
+  that grants entitlements to one org (ADR-0018).
+
+## Security model
+
+- Provider keys never reach clients. Per-org provider credentials are sealed with AWS KMS
+  (`corveil.providerCredentialsKmsKeyArn`). Other stored secrets are encrypted with a key
+  derived from `SECRET_KEY`.
+- RLS keeps every request to its organization.
+- Containers run as UID 1000 with all capabilities dropped.
+- With `networkPolicy.enabled`, pods accept 8000 (api) and the workers health port, and egress
+  DNS, PostgreSQL and HTTPS.
+- Sensors cannot reach private networks unless `knowledge.sensors.allowPrivateNetworks` is set.
+
+## Kubernetes resources
 
 | Resource | Condition | Purpose |
 |----------|-----------|---------|
-| Deployment | Always | Corveil application pods |
-| Service (ClusterIP) | Always | Internal service |
-| ConfigMap (`-env`) | Always | Non-sensitive environment variables |
-| ConfigMap (`-models`) | Always | Models configuration |
-| Secret | `existingSecret` not set | Sensitive credentials |
-| ServiceAccount | `serviceAccount.create` | Pod identity |
-| Ingress | `ingress.enabled` | External HTTP access |
-| VirtualService | `istio.enabled` | Istio service mesh routing |
-| HPA | `autoscaling.enabled` | Horizontal pod autoscaler |
-| PDB | `podDisruptionBudget.enabled` | Disruption budget |
-| NetworkPolicy | `networkPolicy.enabled` | Network access control |
-| PostgreSQL (subchart) | `postgresql.enabled` | Bundled database |
-| Redis (subchart) | `redis.enabled` | Bundled cache/rate limiting |
+| Deployment `corveil` | always | api |
+| Deployment `corveil-workers` | `workers.enabled` | workers |
+| CronJob `corveil-<job>` | `systemJobs.enabled` + per job | system jobs |
+| Service `corveil` | always | api ClusterIP on 8000 |
+| ConfigMap `<release>-env` | always | non-secret env |
+| Secret `<release>-secrets` | no `existingSecret` | DSNs, `SECRET_KEY`, provider keys |
+| Secret `<release>-license` | `license.enabled` without `existingSecret` | license + public key |
+| Secret `<release>-db-init` | `postgresql.enabled` | first-boot roles and pgvector for the bundled DB |
+| ServiceAccount | `serviceAccount.create` | pod identity (IRSA / workload identity) |
+| Ingress / VirtualService | `ingress.enabled` / `istio.enabled` | external access |
+| HPA, PDB | `autoscaling.enabled`, `podDisruptionBudget.enabled` | api scaling and availability |
+| NetworkPolicy | `networkPolicy.enabled` | traffic policy for all Corveil pods |
+| PostgreSQL StatefulSet | `postgresql.enabled` | bundled evaluation database |
 
-## Database Migrations
+## Migrations and upgrades
 
-Migrations are managed automatically by the application at startup via `main.py:lifespan()`. The chart's init container (`wait-for-db`) only verifies database connectivity before the main container starts — it does not run migrations.
-
-The migration runner is idempotent and tracks applied migrations in a `schema_migrations` table.
+The api applies pending migrations (`/app/migrations` in the image) at startup, before it
+listens. It runs them as `DATABASE_URL_PRIVILEGED`, under a Postgres advisory lock, and
+records the result in `schema_migrations`. `/health/ready` reports `schema.applied` against
+`schema.expected`. The workers check the same table and exit while it is behind. There is no
+separate migration Job or `migrate` subcommand. A `helm upgrade` is enough: the new api
+migrates, and the workers follow.

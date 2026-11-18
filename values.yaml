@@ -1,57 +1,149 @@
-# Default values for Corveil AI Gateway.
-# This is a YAML-formatted file.
+# Default values for the Corveil Helm chart.
+#
+# Corveil runs as three workloads from one image (ghcr.io/corveil/corveil):
+#   - api        `corveil serve`       — gateway, REST API, embedded UI; runs migrations at boot
+#   - workers    `corveil workers`     — sensors, ontology, sessions, scheduled loops
+#   - systemJobs `corveil system-job`  — one-shot maintenance jobs, as CronJobs
+#
+# Two install shapes are documented in docs/GETTING_STARTED.md:
+#   - Evaluation: corveil.environment=development + corveil.devAuth=true, bundled PostgreSQL.
+#   - Production: corveil.environment=production, external PostgreSQL with the three
+#     database roles (app / system / owner), see docs/CONFIGURATION.md "Database roles".
 
 domain: "bigbang.dev"
-
-replicaCount: 1
 
 image:
   repository: ghcr.io/corveil/corveil
   pullPolicy: IfNotPresent
-  # Overrides the image tag whose default is the chart appVersion.
+  # -- Overrides the image tag whose default is the chart appVersion.
   tag: ""
+
+# -- The Corveil image is private on GHCR. Create a docker-registry Secret and name it here,
+# e.g. `kubectl create secret docker-registry ghcr-pull --docker-server=ghcr.io ...`.
+imagePullSecrets: []
+# - name: ghcr-pull
 
 nameOverride: "corveil"
 fullnameOverride: "corveil"
 
-# -- Corveil application config
+# -- Corveil application config (rendered into the shared env ConfigMap / Secret)
 corveil:
-  environment: production
+  # -- ENVIRONMENT. The default, `development`, is evaluation mode and matches the bundled
+  # PostgreSQL: it allows devAuth, accepts default session secrets, and lets the system
+  # database pool fall back to DATABASE_URL. Set `production` for a real install; it requires
+  # uiSessionSecret and an external database with a dedicated system role
+  # (see examples/values-production.yaml).
+  environment: development
+  # -- DEV_AUTH. Mock login at /auth/dev-login for evaluation. Only valid with
+  # environment=development; the app refuses to boot otherwise.
+  devAuth: false
   logLevel: INFO
+  # -- SECRET_KEY (required unless existingSecret is set). `openssl rand -hex 32`.
+  # Also derives the credential-encryption key, so keep it stable across upgrades.
   secretKey: ""
+  # -- UI_SESSION_SECRET. Required outside development. `openssl rand -hex 32`.
   uiSessionSecret: ""
+  # -- UI_SESSION_EXPIRY_HOURS
+  uiSessionExpiryHours: 24
+  # -- UI_BASE_URL, the public origin of the UI (e.g. https://corveil.example.com). Used in links
+  # and as the default for sessionAuthAllowedOrigins.
+  uiBaseUrl: ""
+  # -- SESSION_AUTH_ALLOWED_ORIGINS. Origins whose session cookie may call /v1 (the UI chat).
+  # Defaults to uiBaseUrl when empty.
+  sessionAuthAllowedOrigins: []
+  # -- TRUSTED_PROXY_IPS. IPs/CIDRs of the ingress or load balancer, so per-IP rate limits key
+  # on the real client address from X-Forwarded-For.
+  trustedProxyIps: []
+  # -- CORVEIL_PROVIDER_CREDS_KMS_KEY_ARN. AWS KMS key that seals the per-org provider
+  # credentials org admins add in the UI. Outside development, per-org credentials are off
+  # without it and only the deployment-wide keys under `providers` work. The pod needs AWS
+  # credentials for kms:Encrypt/Decrypt (IRSA via serviceAccount.annotations, or extraEnv).
+  providerCredentialsKmsKeyArn: ""
+  # -- API_KEY_PREFIX. Keep `sk-citadel`: it is the on-the-wire key format clients expect.
   apiKeyPrefix: "sk-citadel"
+  # -- AUTO_PROVISION_USERS
   autoProvisionUsers: true
-  devLoginEnabled: false
   guardrails:
+    # -- GUARDRAILS_ENABLED
     enabled: true
-    openaiModeration: true
+    # -- GUARDRAIL_PII_FILTER
     piiFilter: false
   passthrough:
+    # -- PASSTHROUGH_ENABLED
     enabled: true
   plugins:
+    # -- PLUGINS_ENABLED
     enabled: true
-  # OIDC / Okta (optional)
-  okta:
-    enabled: false
-    domain: ""
-    clientId: ""
-    clientSecret: ""
-    sessionSecret: ""
-    sessionExpiryHours: 24
-    baseUrl: ""
 
 # -- Rate limiting defaults
 rateLimiting:
   defaultRpm: 60
   defaultTpm: 100000
 
-# -- Request/response body logging (increases storage usage)
-logging:
-  requestBody: true
-  responseBody: true
+# -- Offline license (ADR-0018). Verified at boot by both api and workers; boot fails closed
+# on a bad, expired or wrong-org license. See docs/GETTING_STARTED.md "Apply a license".
+license:
+  # -- CORVEIL_LICENSE_OFFLINE_ENABLED
+  enabled: false
+  # -- CORVEIL_LICENSE_ORG: the organization name the license was issued to (must match the
+  # name signed into the license; it is not looked up in the database).
+  org: ""
+  # -- CORVEIL_LICENSE_ORG_ID: the UUID of the licensed organization in this install's database
+  # (`corveil whoami` prints it as org_id). Entitlements apply to this org only.
+  orgId: ""
+  # -- License key (the signed token Corveil issues you). Ignored when existingSecret is set.
+  key: ""
+  # -- PEM public key the license is verified against. Ignored when existingSecret is set.
+  publicKey: ""
+  # -- Secret that already holds the license and public key (skips creating one).
+  existingSecret: ""
+  # -- Key names inside the license Secret.
+  keySecretKey: license.jwt
+  publicKeySecretKey: public.pem
+  # -- Directory the license Secret is mounted at (CORVEIL_LICENSE_KEY_FILE / _PUBLIC_KEY_FILE).
+  mountPath: /etc/corveil/license
+  # -- CORVEIL_LICENSE_REVALIDATE_INTERVAL
+  revalidateInterval: 1h
 
-# -- LLM Provider API keys
+# -- Knowledge layer (runs on the workers Deployment)
+knowledge:
+  ontology:
+    # -- ONTOLOGY_ENABLED
+    enabled: true
+    # -- ONTOLOGY_SENSOR_BRIDGE: turn sensor events into graph entities.
+    sensorBridge: false
+    # -- ONTOLOGY_SYNTHESIS_ENABLED: enqueue synthesis runs. Needs a Crow worker runner.
+    synthesis: false
+  sensors:
+    # -- SENSORS_ENABLED: poll the sensors configured per org in the UI.
+    enabled: false
+    # -- CORVEIL_SENSOR_ALLOW_PRIVATE_NETWORKS: let sensors reach private addresses
+    # (self-hosted GitHub Enterprise, Jira Data Center, ...). Single-tenant installs only.
+    allowPrivateNetworks: false
+    # -- CORVEIL_SENSOR_AMBIENT_CREDENTIALS: let S3 / Google sensors with a blank credential
+    # use the pod's own cloud identity. Single-tenant installs only.
+    ambientCredentials: false
+    # -- Filesystem sensor: mount a volume and set FILESYSTEM_SENSOR_ROOT on api and workers.
+    # Each org reads only {root}/{organization_id}/.
+    filesystem:
+      enabled: false
+      mountPath: /var/lib/corveil/sensors
+      # -- Volume source, e.g. `persistentVolumeClaim: {claimName: corveil-sensors}`.
+      # Must be readable from both the api and workers pods.
+      volume: {}
+  sessions:
+    # -- SESSIONS_ENABLED
+    enabled: true
+
+# -- MCP runner channel (ADR 0043). The runner is a separate service this chart does not deploy.
+mcpRunner:
+  # -- MCP_RUNNER_ALLOWED_HOSTS (comma-separated host allowlist)
+  allowedHosts: ""
+  # -- MCP_RUNNER_INTERNAL_SECRET (must match the runner's)
+  internalSecret: ""
+
+# -- Deployment-wide LLM provider credentials. Optional: org admins can also add
+# per-org credentials in the UI (Providers).
 providers:
   openrouter:
     apiKey: ""
@@ -70,32 +162,126 @@ providers:
     secretAccessKey: ""
     useTaskRole: false
 
-# -- Bring your own Kubernetes Secret (skips creating the built-in secret)
+# -- Bring your own Kubernetes Secret (skips creating the built-in one). It is loaded with
+# envFrom into every Corveil container, so it must hold the env names directly:
+# DATABASE_URL, DATABASE_URL_SYSTEM, DATABASE_URL_PRIVILEGED, SECRET_KEY, UI_SESSION_SECRET,
+# plus any provider keys and MCP_RUNNER_INTERNAL_SECRET you use.
 existingSecret: ""
 
-# -- Bundled PostgreSQL (Bitnami subchart)
+# -- Bundled PostgreSQL (Bitnami subchart), for evaluation. On first boot an init script
+# (templates/db-init-secret.yaml) creates pgvector and the corveil_app / corveil_system roles,
+# so the bundled database has the same role layout as production. All three roles use
+# auth.password. It is a single instance with no backups: use externalDatabase in production.
 postgresql:
   enabled: true
   auth:
     database: citadel
+    # -- Schema owner. The api runs migrations as this role.
     username: citadel
-    # -- Change this in production
+    # -- Password for the owner, corveil_app and corveil_system. Change it if you keep the
+    # bundled database beyond an evaluation. Use URL-safe characters (it goes into a DSN).
     password: "citadel"
   primary:
     persistence:
       size: 8Gi
+    initdb:
+      # -- Creates pgvector and the Corveil roles. Runs only on an empty data volume.
+      scriptsSecret: "{{ .Release.Name }}-db-init"
 
-# -- External database (when postgresql.enabled=false)
+# -- External PostgreSQL 16+ with pgvector (when postgresql.enabled=false).
+# See docs/CONFIGURATION.md "Database roles" for the role setup.
 externalDatabase:
+  # -- DATABASE_URL: the runtime role (corveil_app, NOBYPASSRLS).
   url: ""
+  # -- DATABASE_URL_SYSTEM: the system role (corveil_system, BYPASSRLS). Required outside development.
+  systemUrl: ""
+  # -- DATABASE_URL_PRIVILEGED: the schema owner (corveil). The api runs migrations with it.
+  # Leave empty to migrate with DATABASE_URL (single-role installs).
+  privilegedUrl: ""
 
-# -- Bundled Redis (Bitnami subchart, optional)
-redis:
-  enabled: false
+# -- API Deployment (`corveil serve`)
+api:
+  replicaCount: 1
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+  # -- Extra env for the api container only
+  extraEnv: []
+  podAnnotations: {}
+  # -- Affinity for api pods; overrides the global `affinity` when set. With more than one
+  # replica, spread them across nodes (see examples/values-production.yaml).
+  affinity: {}
 
-# -- External Redis (when redis.enabled=false)
-externalRedis:
-  url: ""
+# -- Workers Deployment (`corveil workers`)
+workers:
+  enabled: true
+  # -- Keep at 1. Scheduled loops take a database leader lock, so more replicas are safe,
+  # but they add no throughput for a single install.
+  replicaCount: 1
+  # -- WORKERS_HEALTH_PORT
+  healthPort: 8081
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+  # -- Extra env for the workers container only
+  extraEnv: []
+  podAnnotations: {}
+
+# -- System jobs (`corveil system-job <name>`) as CronJobs. Schedules are cron syntax in the
+# controller's time zone (UTC unless timeZone is set) and mirror the hosted service.
+systemJobs:
+  enabled: true
+  # -- CronJob timeZone, e.g. "Etc/UTC". Empty uses the controller default.
+  timeZone: ""
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 600
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  backoffLimit: 0
+  activeDeadlineSeconds: 3600
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  jobs:
+    # Retention and cleanup
+    audit_retention_purge:            { enabled: true, schedule: "0 3 * * *" }
+    hard_delete_archived_orgs:        { enabled: true, schedule: "45 3 * * *" }
+    request_log_retention_purge:      { enabled: true, schedule: "15 5 * * *" }
+    client_error_retention_purge:     { enabled: true, schedule: "0 6 * * *" }
+    jobs_retention_purge:             { enabled: true, schedule: "15 6 * * *" }
+    oauth_client_unconsented_purge:   { enabled: true, schedule: "0 8 * * *" }
+    # Models and pricing
+    catalog_sync:                     { enabled: true, schedule: "30 4 * * *" }
+    pricing_sync:                     { enabled: true, schedule: "45 4 * * *" }
+    # Knowledge graph and sessions
+    ontology_identity_undermerge_sweep: { enabled: true, schedule: "0 7 * * *" }
+    ontology_entity_degree_recount:   { enabled: true, schedule: "30 8 * * *" }
+    crow_session_derive:              { enabled: true, schedule: "*/5 * * * *" }
+    gateway_session_derive:           { enabled: true, schedule: "*/5 * * * *" }
+    attention_detectors:              { enabled: true, schedule: "*/15 * * * *" }
+    # Worker runs
+    worker_run_abandon_sweep:         { enabled: true, schedule: "*/15 * * * *" }
+    worker_run_input_expiry:          { enabled: true, schedule: "15 8 * * *" }
+    worker_run_queue_expiry:          { enabled: true, schedule: "45 8 * * *" }
+    # Object-storage sweeps. Enable once artifact storage (CORVEIL_WORKER_ARTIFACT_S3_BUCKET)
+    # is configured: without it the artifact purges refuse to run.
+    worker_artifact_retention_purge:       { enabled: false, schedule: "30 5 * * *" }
+    crow_session_artifact_retention_purge: { enabled: false, schedule: "45 5 * * *" }
+    dashboard_artifact_retention_purge:    { enabled: false, schedule: "45 6 * * *" }
+    worker_run_payload_retention_purge:    { enabled: false, schedule: "30 6 * * *" }
+    worker_run_payload_offload:            { enabled: false, schedule: "20 * * * *" }
 
 # -- Istio / Big Bang integration
 istio:
@@ -140,63 +326,39 @@ securityContext:
   runAsUser: 1000
   runAsGroup: 1000
 
-resources:
-  requests:
-    cpu: 250m
-    memory: 512Mi
-  limits:
-    cpu: "1"
-    memory: 1Gi
-
+# -- HorizontalPodAutoscaler for the api Deployment
 autoscaling:
   enabled: false
   minReplicas: 1
   maxReplicas: 3
   targetCPUUtilizationPercentage: 70
 
-# -- PodDisruptionBudget
+# -- PodDisruptionBudget for the api Deployment
 podDisruptionBudget:
   enabled: false
   minAvailable: 1
   # maxUnavailable: 1
+  # -- Let a node drain evict api pods that are not Ready, so a crash-looping pod can't block it.
+  unhealthyPodEvictionPolicy: AlwaysAllow
 
-# -- NetworkPolicy
+# -- NetworkPolicy covering the api, workers and system-job pods
 networkPolicy:
   enabled: false
   # -- Additional egress rules (e.g., to allow specific LLM API endpoints)
   additionalEgressRules: []
 
-# -- Extra environment variables to inject into the Corveil container
+# -- Extra environment variables for every Corveil container (api, workers, system jobs)
 extraEnv: []
 # - name: MY_CUSTOM_VAR
 #   value: "my-value"
 
-# -- Extra volumes to add to the pod
+# -- Extra volumes / mounts for every Corveil pod
 extraVolumes: []
-# - name: my-config
-#   configMap:
-#     name: my-config
-
-# -- Extra volume mounts for the Corveil container
 extraVolumeMounts: []
-# - name: my-config
-#   mountPath: /app/custom-config
-
-# -- Models configuration override. When set, replaces the default models.yaml.
-# See the default configmap.yaml for the expected format.
-# modelsConfig: |
-#   settings:
-#     model_curation_enabled: true
-#     fallback_to_dynamic: false
-#   model_list:
-#     - model_name: my-model
-#       provider: openrouter
-#       provider_params:
-#         model: anthropic/claude-sonnet-4.5
 
 nodeSelector: {}
 tolerations: []
 affinity: {}
+# -- Labels / annotations added to every Corveil pod
 podLabels: {}
 podAnnotations: {}
-imagePullSecrets: []

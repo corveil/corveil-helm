@@ -1,49 +1,55 @@
-Corveil AI Gateway has been deployed!
+Corveil {{ .Chart.AppVersion }} is deployed (chart {{ .Chart.Version }}).
 
-{{- if .Values.ingress.enabled }}
-
-Access Corveil at:
-{{- range .Values.ingress.hosts }}
-  http{{ if $.Values.ingress.tls }}s{{ end }}://{{ .host }}
+  api          deployment/{{ include "corveil.fullname" . }}          corveil serve (gateway, API, UI)
+{{- if .Values.workers.enabled }}
+  workers      deployment/{{ include "corveil.workers.fullname" . }}  corveil workers
+{{- end }}
+{{- if .Values.systemJobs.enabled }}
+  system jobs  cronjobs {{ include "corveil.fullname" . }}-<job>       kubectl -n {{ .Release.Namespace }} get cronjobs
 {{- end }}
 
+The api runs database migrations on first start. Until they finish, the workers restart
+with "database schema is behind". Watch it come up:
+  kubectl -n {{ .Release.Namespace }} get pods -w
+{{- if eq (toString .Values.corveil.environment) "development" }}
+
+*** EVALUATION MODE (corveil.environment=development) ***
+Default secrets are accepted, and the system database pool falls back to DATABASE_URL when
+no system DSN is set.
+{{- if .Values.corveil.devAuth }}
+Dev login is ON: anyone who can reach the UI can sign in as an org owner. Keep the UI on
+kubectl port-forward. Do not expose it through an Ingress.
+{{- end }}
+Not for production: see docs/GETTING_STARTED.md "Production".
+{{- end }}
+{{- if .Values.ingress.enabled }}
+
+Corveil is at:
+{{- range .Values.ingress.hosts }}
+  http{{ if $.Values.ingress.tls }}s{{ end }}://{{ .host }}/ui
+{{- end }}
 {{- else if contains "NodePort" .Values.service.type }}
 
 Get the application URL:
   export NODE_PORT=$(kubectl get --namespace {{ .Release.Namespace }} -o jsonpath="{.spec.ports[0].nodePort}" services {{ include "corveil.fullname" . }})
   export NODE_IP=$(kubectl get nodes --namespace {{ .Release.Namespace }} -o jsonpath="{.items[0].status.addresses[0].address}")
-  echo http://$NODE_IP:$NODE_PORT
-
+  echo http://$NODE_IP:$NODE_PORT/ui
 {{- else if contains "ClusterIP" .Values.service.type }}
 
-Port-forward to access the UI:
+Open the UI:
   kubectl --namespace {{ .Release.Namespace }} port-forward svc/{{ include "corveil.fullname" . }} 8000:{{ .Values.service.port }}
-
-Then open: http://localhost:8000/ui
-
+  then browse to http://localhost:8000/ui{{ if .Values.corveil.devAuth }} and choose "Dev login"{{ end }}
 {{- end }}
 
-{{- if .Values.corveil.devLoginEnabled }}
-
-Dev login is ENABLED. Click "Dev Login" on the UI to get started.
-Disable for production: --set corveil.devLoginEnabled=false
+Next steps (docs/GETTING_STARTED.md):
+  1. Create an API key in the UI (API Keys). It starts with {{ .Values.corveil.apiKeyPrefix }}-.
+  2. Check the install:   CORVEIL_URL=http://localhost:8000 CORVEIL_API_KEY=<key> corveil health
+  3. Connect Claude Code: eval "$(corveil env claude-code --mode direct)" && claude
+{{- if not .Values.knowledge.sensors.enabled }}
+  4. Enable sensors:      --set knowledge.sensors.enabled=true --set knowledge.ontology.sensorBridge=true
 {{- end }}
-
-Next steps — create your first API key:
-  1. Open the UI and navigate to API Keys
-  2. Click "Create Key" and copy the generated key (starts with {{ .Values.corveil.apiKeyPrefix }}-)
-  3. Configure your client:
-
-Configure Claude Code to use Corveil:
-  claude config set --global apiBaseUrl http://localhost:8000/v1
-
-Configure OpenAI-compatible clients:
-  export OPENAI_API_BASE=http://localhost:8000/v1
-  export OPENAI_API_KEY=<your-corveil-api-key>
-
 {{- if .Values.postgresql.enabled }}
 
-NOTE: The bundled PostgreSQL uses a PersistentVolumeClaim that is NOT deleted
-on helm uninstall. To fully clean up after uninstalling:
-  kubectl delete pvc data-{{ .Release.Name }}-postgresql-0
+The bundled PostgreSQL keeps its PersistentVolumeClaim after helm uninstall. To remove it:
+  kubectl -n {{ .Release.Namespace }} delete pvc data-{{ .Release.Name }}-postgresql-0
 {{- end }}

@@ -1,0 +1,20 @@
+# Evaluation install: bundled PostgreSQL, dev login, no SSO.
+# NOT for production: dev login lets anyone who can reach the UI sign in as the dev admin.
+#
+#   helm install corveil oci://ghcr.io/corveil/corveil-helm/corveil-chart \
+#     -f examples/values-evaluation.yaml \
+#     --set corveil.secretKey="$(openssl rand -hex 32)"
+#
+# See docs/GETTING_STARTED.md.
+
+imagePullSecrets:
+  - name: ghcr-pull
+
+corveil:
+  environment: development
+  devAuth: true
+  # The UI is reached through `kubectl port-forward svc/corveil 8000:8000`.
+  uiBaseUrl: "http://localhost:8000"
+
+postgresql:
+  enabled: true
