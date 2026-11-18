@@ -5,7 +5,7 @@ on:
     branches: [main]
 
 jobs:
-  lint:
+  lint-matrix:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -79,3 +79,15 @@ jobs:
           expect_fail --set corveil.devLoginEnabled=true
           expect_fail --set redis.enabled=true
           expect_fail --set corveil.okta.enabled=true
+
+  # The required status check on main is named `lint`; this job reports it once
+  # every matrix leg and the guard checks have passed.
+  lint:
+    runs-on: ubuntu-latest
+    needs: [lint-matrix, guards]
+    if: always()
+    steps:
+      - name: All lint jobs passed
+        run: |
+          test "${{ needs.lint-matrix.result }}" = success
+          test "${{ needs.guards.result }}" = success
