@@ -1,0 +1,81 @@
+# Production install: external PostgreSQL with the three Corveil roles, secrets from an
+# existing Secret, TLS ingress, offline license.
+#
+# Prerequisites (docs/GETTING_STARTED.md "Production"):
+#   - PostgreSQL 16+ with pgvector and the corveil / corveil_app / corveil_system roles
+#     (docs/CONFIGURATION.md "Database roles")
+#   - Secret `corveil-secrets` holding DATABASE_URL, DATABASE_URL_SYSTEM,
+#     DATABASE_URL_PRIVILEGED, SECRET_KEY, UI_SESSION_SECRET (and any provider keys)
+#   - Secret `corveil-license` holding license.jwt and public.pem
+#   - Secret `ghcr-pull` for the private image
+#
+#   helm install corveil oci://ghcr.io/corveil/corveil-helm/corveil-chart \
+#     -f examples/values-production.yaml
+
+imagePullSecrets:
+  - name: ghcr-pull
+
+corveil:
+  environment: production
+  devAuth: false
+  uiBaseUrl: "https://corveil.example.com"
+  # The ingress controller's pod or node CIDR, so per-IP limits see the real client.
+  trustedProxyIps:
+    - "10.0.0.0/8"
+
+existingSecret: corveil-secrets
+
+postgresql:
+  enabled: false
+
+# Leave empty when existingSecret holds the DATABASE_URL* keys.
+externalDatabase:
+  url: ""
+  systemUrl: ""
+  privilegedUrl: ""
+
+license:
+  enabled: true
+  # The organization name your license was issued to, and that organization's UUID in this
+  # install (`corveil whoami` prints it as org_id).
+  org: "Example Corp"
+  orgId: "00000000-0000-0000-0000-000000000000"
+  existingSecret: corveil-license
+
+api:
+  replicaCount: 2
+  # Spread api replicas across nodes.
+  affinity:
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          podAffinityTerm:
+            topologyKey: kubernetes.io/hostname
+            labelSelector:
+              matchLabels:
+                app.kubernetes.io/name: corveil
+                app.kubernetes.io/component: api
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    # Long-lived streaming responses (chat completions, log tail).
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-body-size: "32m"
+  hosts:
+    - host: corveil.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: corveil-tls
+      hosts:
+        - corveil.example.com
+
+networkPolicy:
+  enabled: true

@@ -1,0 +1,93 @@
+{{- if .Values.systemJobs.enabled }}
+{{- $root := . }}
+{{- $sj := .Values.systemJobs }}
+{{- range $name, $job := $sj.jobs }}
+{{- if $job.enabled }}
+{{- $cronName := printf "%s-%s" (include "corveil.fullname" $root) ($name | replace "_" "-") | trunc 52 | trimSuffix "-" }}
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ $cronName }}
+  labels:
+    {{- include "corveil.labels" $root | nindent 4 }}
+    app.kubernetes.io/component: system-job
+    app.kubernetes.io/part-of: corveil
+    corveil.io/system-job: {{ $name | replace "_" "-" | quote }}
+spec:
+  schedule: {{ required (printf "systemJobs.jobs.%s.schedule is required" $name) $job.schedule | quote }}
+  {{- with $sj.timeZone }}
+  timeZone: {{ . | quote }}
+  {{- end }}
+  concurrencyPolicy: {{ $sj.concurrencyPolicy }}
+  startingDeadlineSeconds: {{ $sj.startingDeadlineSeconds }}
+  successfulJobsHistoryLimit: {{ $sj.successfulJobsHistoryLimit }}
+  failedJobsHistoryLimit: {{ $sj.failedJobsHistoryLimit }}
+  jobTemplate:
+    spec:
+      backoffLimit: {{ $sj.backoffLimit }}
+      activeDeadlineSeconds: {{ $sj.activeDeadlineSeconds }}
+      template:
+        metadata:
+          annotations:
+            checksum/env: {{ include (print $root.Template.BasePath "/env.yaml") $root | sha256sum }}
+            checksum/secret: {{ include (print $root.Template.BasePath "/secrets.yaml") $root | sha256sum }}
+          {{- with $root.Values.podAnnotations }}
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          labels:
+            app.kubernetes.io/name: {{ printf "%s-system-job" (include "corveil.name" $root) | trunc 63 | trimSuffix "-" }}
+            app.kubernetes.io/instance: {{ $root.Release.Name }}
+            app.kubernetes.io/component: system-job
+            app.kubernetes.io/part-of: corveil
+            corveil.io/system-job: {{ $name | replace "_" "-" | quote }}
+            {{- with $root.Values.podLabels }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+        spec:
+          restartPolicy: Never
+          {{- with $root.Values.imagePullSecrets }}
+          imagePullSecrets:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          serviceAccountName: {{ include "corveil.serviceAccountName" $root }}
+          securityContext:
+            {{- toYaml $root.Values.podSecurityContext | nindent 12 }}
+          {{- with $root.Values.extraVolumes }}
+          volumes:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          containers:
+            - name: system-job
+              securityContext:
+                {{- toYaml $root.Values.securityContext | nindent 16 }}
+              image: {{ include "corveil.image" $root | quote }}
+              imagePullPolicy: {{ $root.Values.image.pullPolicy }}
+              args: ["/app/corveil", "system-job", {{ $name | quote }}]
+              {{- with $root.Values.extraEnv }}
+              env:
+                {{- toYaml . | nindent 16 }}
+              {{- end }}
+              envFrom:
+                {{- include "corveil.envFrom" $root | nindent 16 }}
+              resources:
+                {{- toYaml $sj.resources | nindent 16 }}
+              {{- with $root.Values.extraVolumeMounts }}
+              volumeMounts:
+                {{- toYaml . | nindent 16 }}
+              {{- end }}
+          {{- with $root.Values.nodeSelector }}
+          nodeSelector:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with $root.Values.affinity }}
+          affinity:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with $root.Values.tolerations }}
+          tolerations:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+{{- end }}
+{{- end }}
+{{- end }}

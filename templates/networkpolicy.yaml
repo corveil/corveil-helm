@@ -6,16 +6,19 @@ metadata:
   labels:
     {{- include "corveil.labels" . | nindent 4 }}
 spec:
+  # Every Corveil pod in this release: api, workers and system jobs.
   podSelector:
     matchLabels:
-      {{- include "corveil.selectorLabels" . | nindent 6 }}
+      {{- include "corveil.partOfLabels" . | nindent 6 }}
   policyTypes:
     - Ingress
     - Egress
   ingress:
-    # Allow inbound traffic to the HTTP port
+    # api HTTP port and the workers health port (kubelet probes)
     - ports:
         - port: 8000
+          protocol: TCP
+        - port: {{ .Values.workers.healthPort }}
           protocol: TCP
   egress:
     # Allow DNS resolution
@@ -27,10 +30,6 @@ spec:
     # Allow PostgreSQL
     - ports:
         - port: 5432
-          protocol: TCP
-    # Allow Redis
-    - ports:
-        - port: 6379
           protocol: TCP
     # Allow HTTPS to external LLM APIs
     - ports:

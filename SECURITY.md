@@ -35,7 +35,8 @@ This policy covers the Helm chart templates, default configurations, and documen
 When deploying Corveil, we recommend:
 
 - Always set a strong `corveil.secretKey` (use `openssl rand -hex 32`)
-- Disable `corveil.devLoginEnabled` in production
+- Run production with `corveil.environment=production` and `corveil.devAuth=false` (dev login is evaluation-only)
+- Give the database the three Corveil roles (`corveil_app`, `corveil_system`, owner) so row-level security isolates organizations
 - Use `existingSecret` with a secrets manager (Vault, Sealed Secrets, ESO) for sensitive values
 - Enable network policies in production clusters
 - Use TLS termination via Ingress or Istio

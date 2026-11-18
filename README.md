@@ -1,92 +1,70 @@
 # Corveil Helm Chart
 
-Helm chart for [Corveil AI Gateway](https://github.com/corveil/corveil) — a zero-trust AI gateway with spend tracking, guardrails, and OpenAI-compatible API.
+Helm chart for [Corveil](https://github.com/corveil/corveil): an AI gateway (virtual keys,
+spend tracking, guardrails, OpenAI- and Anthropic-compatible APIs) and an organizational
+knowledge graph built from the tools your teams use.
 
-Works as a standalone Kubernetes install **and** as a Big Bang package.
+It runs the whole product on your own Kubernetes cluster: the **api** (`corveil serve`), the
+**workers** (`corveil workers`), and the scheduled **system jobs** as CronJobs. It works as a
+standalone install and as a Big Bang package.
 
-## Quick Start
+Chart `2.0.0` deploys Corveil **v0.5.20**.
+
+## Quick start (evaluation)
 
 ```bash
-helm install corveil oci://ghcr.io/corveil/corveil-helm/corveil-chart \
-  --set corveil.secretKey="$(openssl rand -hex 32)" \
+kubectl create namespace corveil
+kubectl -n corveil create secret docker-registry ghcr-pull \
+  --docker-server=ghcr.io --docker-username=<github-user> --docker-password=<token-with-read:packages>
+
+helm install corveil oci://ghcr.io/corveil/corveil-helm/corveil-chart -n corveil \
+  --set imagePullSecrets[0].name=ghcr-pull \
   --set corveil.environment=development \
-  --set corveil.devLoginEnabled=true \
-  --set providers.openrouter.apiKey="sk-or-xxx"
+  --set corveil.devAuth=true \
+  --set corveil.uiBaseUrl=http://localhost:8000 \
+  --set corveil.secretKey="$(openssl rand -hex 32)"
+
+kubectl -n corveil port-forward svc/corveil 8000:8000
 ```
 
-> **Note**: The flags above enable evaluation mode (development environment with dev login). See [Evaluation Mode](#evaluation-mode) for details.
+Open <http://localhost:8000/ui> and choose **Dev login**. You become the owner of a local
+organization. From there, create an API key, connect a client, enable a sensor and apply a
+license: **[docs/GETTING_STARTED.md](docs/GETTING_STARTED.md)** walks through each step.
 
-Port-forward and open the UI:
-
-```bash
-kubectl port-forward svc/corveil 8000:8000
-open http://localhost:8000/ui
-```
-
-Click **Dev Login** to get started immediately — no OIDC setup required.
+Evaluation mode uses a bundled PostgreSQL and a dev login that anyone who can reach the UI can
+use. Don't expose it.
 
 ## Prerequisites
 
-- Kubernetes 1.23+
-- Helm 3.10+
-- **Pull access to the Corveil image.** The default image
-  (`ghcr.io/corveil/corveil`) is a **private** package. Create an image pull
-  secret and reference it so the cluster can pull it:
-
-  ```bash
-  kubectl create secret docker-registry corveil-ghcr \
-    --docker-server=ghcr.io \
-    --docker-username=<github-user> \
-    --docker-password=<github-token-with-read:packages>
-
-  helm install corveil oci://ghcr.io/corveil/corveil-helm/corveil-chart \
-    --set imagePullSecrets[0].name=corveil-ghcr \
-    ...
-  ```
-
-  Skip this only if you override `image.repository` to an image your cluster can already pull.
+- Kubernetes 1.27+ and Helm 3.10+
+- Pull access to the private image `ghcr.io/corveil/corveil` (a `read:packages` token on an
+  account Corveil has granted access)
+- For production: PostgreSQL 16+ with pgvector and the three Corveil roles
+  ([Database roles](docs/CONFIGURATION.md#database-roles))
 
 ## Documentation
 
-- **[Getting Started Guide](docs/GETTING_STARTED.md)** — End-to-end deployment walkthrough
-- **[Configuration Reference](docs/CONFIGURATION.md)** — Complete values.yaml parameter reference
-- **[Architecture Overview](docs/ARCHITECTURE_OVERVIEW.md)** — System design for operators
+- **[Getting Started](docs/GETTING_STARTED.md)**: on-prem quick start, then production
+- **[Configuration Reference](docs/CONFIGURATION.md)**: every value, with the env var it sets
+- **[Architecture Overview](docs/ARCHITECTURE_OVERVIEW.md)**: workloads, database roles,
+  request flow
+- **[CHANGELOG](CHANGELOG.md)**: upgrade notes (2.0.0 is a breaking release)
 
-## Installation
-
-### Evaluation Mode
-
-For trying out Corveil before production deployment. Enables the dev login UI so you can create users and API keys without configuring OIDC.
+## Production
 
 ```bash
-helm install corveil oci://ghcr.io/corveil/corveil-helm/corveil-chart \
-  --set corveil.secretKey="change-me" \
-  --set corveil.environment=development \
-  --set corveil.devLoginEnabled=true \
-  --set providers.openrouter.apiKey="sk-or-xxx"
+helm install corveil oci://ghcr.io/corveil/corveil-helm/corveil-chart -n corveil \
+  -f examples/values-production.yaml
 ```
 
-This deploys Corveil with the bundled PostgreSQL, development mode, and dev login enabled.
+[`examples/values-production.yaml`](examples/values-production.yaml) uses an external database,
+secrets from an existing Secret, TLS ingress, two api replicas, a PDB and a NetworkPolicy. Read
+[Getting Started → Production](docs/GETTING_STARTED.md#production) first. Two v0.5 constraints
+matter: production UI sign-in is WorkOS only, and per-org provider credentials need AWS KMS.
 
-### Production (external database)
-
-```bash
-helm install corveil oci://ghcr.io/corveil/corveil-helm/corveil-chart \
-  --set corveil.secretKey="$(openssl rand -hex 32)" \
-  --set corveil.okta.enabled=true \
-  --set corveil.okta.domain="company.okta.com" \
-  --set corveil.okta.clientId="0oaXXX" \
-  --set corveil.okta.clientSecret="secret" \
-  --set corveil.okta.sessionSecret="$(openssl rand -hex 32)" \
-  --set postgresql.enabled=false \
-  --set externalDatabase.url="postgresql://user:pass@db-host:5432/citadel" \
-  --set providers.openrouter.apiKey="sk-or-xxx"
-```
-
-### Big Bang
+## Big Bang
 
 ```yaml
-# In your Big Bang values override:
 addons:
   corveil:
     enabled: true
@@ -98,99 +76,51 @@ addons:
             - "istio-system/public"
           hosts:
             - "corveil.bigbang.dev"
+      imagePullSecrets:
+        - name: ghcr-pull
       corveil:
-        secretKey: "change-me"
-      providers:
-        openrouter:
-          apiKey: "sk-or-xxx"
+        environment: production
+        uiBaseUrl: "https://corveil.bigbang.dev"
+      existingSecret: corveil-secrets   # DATABASE_URL, DATABASE_URL_SYSTEM, DATABASE_URL_PRIVILEGED, SECRET_KEY, UI_SESSION_SECRET
+      postgresql:
+        enabled: false
 ```
 
-### Using an Existing Secret
-
-If you manage secrets externally (Vault, Sealed Secrets, ESO), create a Kubernetes Secret with the expected keys and reference it:
-
-```bash
-helm install corveil oci://ghcr.io/corveil/corveil-helm/corveil-chart \
-  --set existingSecret=my-corveil-secrets
-```
-
-Required keys in your secret: `DATABASE_URL`, `SECRET_KEY`. Optional: `OPENROUTER_API_KEY`, `ANTHROPIC_API_KEY`, etc.
-
-## Configuration
+## Key values
 
 | Parameter | Description | Default |
 |-----------|-------------|---------|
-| `image.repository` | Container image | `ghcr.io/corveil/corveil` |
-| `image.tag` | Image tag (defaults to appVersion) | `""` |
-| `corveil.secretKey` | Session signing key (**required**) | `""` |
-| `corveil.environment` | `development`, `staging`, or `production` | `production` |
-| `corveil.devLoginEnabled` | Enable dev login bypass | `false` |
-| `corveil.logLevel` | Log level | `INFO` |
-| `corveil.autoProvisionUsers` | Auto-create users from headers | `true` |
-| `corveil.guardrails.enabled` | Enable guardrails | `true` |
-| `corveil.passthrough.enabled` | Enable API key passthrough | `true` |
-| `corveil.plugins.enabled` | Enable plugin system | `true` |
-| `corveil.okta.enabled` | Enable Okta OIDC | `false` |
-| `providers.openrouter.apiKey` | OpenRouter API key | `""` |
-| `providers.anthropic.apiKey` | Anthropic API key | `""` |
-| `providers.vertexai.projectId` | GCP project ID | `""` |
-| `providers.bedrock.enabled` | Enable AWS Bedrock | `false` |
-| `postgresql.enabled` | Deploy bundled PostgreSQL | `true` |
-| `postgresql.auth.password` | PostgreSQL password | `"citadel"` |
-| `externalDatabase.url` | External PostgreSQL URL | `""` |
-| `redis.enabled` | Deploy bundled Redis | `false` |
-| `istio.enabled` | Enable Istio VirtualService | `false` |
-| `ingress.enabled` | Enable Kubernetes Ingress | `false` |
-| `autoscaling.enabled` | Enable HPA | `false` |
-| `existingSecret` | Use external Secret | `""` |
+| `corveil.environment` | `development` (evaluation) or `production` | `development` |
+| `corveil.devAuth` | Evaluation dev login (`development` only) | `false` |
+| `corveil.secretKey` | Encryption / signing key (**required** unless `existingSecret`) | `""` |
+| `corveil.uiSessionSecret` | UI session key (required outside `development`) | `""` |
+| `corveil.uiBaseUrl` | Public UI origin | `""` |
+| `existingSecret` | Bring your own Secret of env vars | `""` |
+| `postgresql.enabled` | Bundled evaluation PostgreSQL | `true` |
+| `externalDatabase.url` / `systemUrl` / `privilegedUrl` | The three role DSNs | `""` |
+| `api.replicaCount` | api replicas | `1` |
+| `workers.enabled` | Deploy the workers | `true` |
+| `systemJobs.enabled` / `systemJobs.jobs.*` | System-job CronJobs | enabled |
+| `knowledge.sensors.enabled` | Poll configured sensors | `false` |
+| `knowledge.ontology.sensorBridge` | Turn sensor events into graph entities | `false` |
+| `license.enabled` | Offline license | `false` |
+| `providers.*` | Deployment-wide provider keys | `""` |
+| `ingress.enabled` / `istio.enabled` | External access | `false` |
 
-For the complete configuration reference, see [docs/CONFIGURATION.md](docs/CONFIGURATION.md).
+See [docs/CONFIGURATION.md](docs/CONFIGURATION.md) for everything else.
 
-## Client Configuration
+## Database migrations
 
-### Claude Code
-
-```bash
-claude config set --global apiBaseUrl http://<corveil-host>:8000/v1
-```
-
-### OpenAI SDK / Python
-
-```python
-from openai import OpenAI
-client = OpenAI(
-    base_url="http://<corveil-host>:8000/v1",
-    api_key="<your-corveil-api-key>",
-)
-```
-
-### curl
-
-```bash
-curl http://<corveil-host>:8000/v1/chat/completions \
-  -H "Authorization: Bearer <your-corveil-api-key>" \
-  -H "Content-Type: application/json" \
-  -d '{"model": "or-claude-sonnet-4.5 [EXTERNAL]", "messages": [{"role": "user", "content": "Hello"}]}'
-```
-
-## Database Migrations
-
-Migrations run automatically inside the application on startup via the app's lifespan handler. The init container only waits for database connectivity before the main container starts — it does not run migrations.
-
-The migration runner is idempotent and tracks state in a `schema_migrations` table.
+The api runs migrations at startup, under a Postgres advisory lock, as the privileged role.
+The workers wait until the schema matches. Upgrades need no separate migration step.
 
 ## Uninstall
 
 ```bash
-helm uninstall corveil
-```
-
-Note: The bundled PostgreSQL PVC is **not** deleted automatically. To fully clean up:
-
-```bash
-kubectl delete pvc data-corveil-postgresql-0
+helm -n corveil uninstall corveil
+kubectl -n corveil delete pvc data-corveil-postgresql-0   # bundled PostgreSQL only; deletes its data
 ```
 
 ## License
 
-MIT License — see [LICENSE](LICENSE) for details.
+MIT License. See [LICENSE](LICENSE).

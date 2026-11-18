@@ -1,20 +1,16 @@
 apiVersion: v2
 name: corveil-chart
-description: Helm chart for Corveil AI Gateway. Big Bang ready.
+description: Helm chart for Corveil (API, workers and scheduled system jobs). Big Bang ready.
 type: application
 
 # Chart version — increment on each release
-version: 1.0.0
+version: 2.0.0
 
 # Application version deployed by this chart
-appVersion: "0.3.4"
+appVersion: "0.5.20"
 
 dependencies:
   - name: postgresql
     version: "18.5.2"
     repository: oci://registry-1.docker.io/bitnamicharts
     condition: postgresql.enabled
-  - name: redis
-    version: "20.6.2"
-    repository: oci://registry-1.docker.io/bitnamicharts
-    condition: redis.enabled

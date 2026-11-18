@@ -4,9 +4,11 @@ metadata:
   name: {{ include "corveil.fullname" . }}
   labels:
     {{- include "corveil.labels" . | nindent 4 }}
+    app.kubernetes.io/component: api
+    app.kubernetes.io/part-of: corveil
 spec:
   {{- if not .Values.autoscaling.enabled }}
-  replicas: {{ .Values.replicaCount }}
+  replicas: {{ .Values.api.replicaCount }}
   {{- end }}
   selector:
     matchLabels:
@@ -16,12 +18,16 @@ spec:
       annotations:
         checksum/env: {{ include (print $.Template.BasePath "/env.yaml") . | sha256sum }}
         checksum/secret: {{ include (print $.Template.BasePath "/secrets.yaml") . | sha256sum }}
-        checksum/models: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
       {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.api.podAnnotations }}
         {{- toYaml . | nindent 8 }}
       {{- end }}
       labels:
         {{- include "corveil.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: api
+        app.kubernetes.io/part-of: corveil
         {{- with .Values.podLabels }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
@@ -33,59 +39,43 @@ spec:
       serviceAccountName: {{ include "corveil.serviceAccountName" . }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      {{- with (include "corveil.volumes" . | trim) }}
       volumes:
-        - name: models-config
-          configMap:
-            name: {{ .Release.Name }}-models
-        {{- with .Values.extraVolumes }}
-        {{- toYaml . | nindent 8 }}
-        {{- end }}
-      {{- if .Values.postgresql.enabled }}
-      initContainers:
-        - name: wait-for-db
-          image: busybox:1.37
-          command:
-            - sh
-            - -c
-            - |
-              echo "Waiting for {{ .Release.Name }}-postgresql:5432..."
-              for i in $(seq 1 30); do
-                if nc -z {{ .Release.Name }}-postgresql 5432; then
-                  echo "Database is ready"
-                  exit 0
-                fi
-                echo "Attempt $i/30 — waiting 2s..."
-                sleep 2
-              done
-              echo "Database not ready after 60s"
-              exit 1
-          securityContext:
-            {{- toYaml .Values.securityContext | nindent 12 }}
+        {{- . | nindent 8 }}
+      {{- end }}
+      {{- with (include "corveil.waitForDb" . | trim) }}
+      {{- . | nindent 6 }}
       {{- end }}
       containers:
-        - name: {{ .Chart.Name }}
+        - name: api
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          image: {{ include "corveil.image" . | quote }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args: ["/app/corveil", "serve"]
+          {{- with (concat .Values.extraEnv .Values.api.extraEnv) }}
           env:
-            {{- with .Values.extraEnv }}
             {{- toYaml . | nindent 12 }}
-            {{- end }}
+          {{- end }}
           envFrom:
-            - configMapRef:
-                name: {{ .Release.Name }}-env
-            - secretRef:
-                name: {{ include "corveil.secretName" . }}
+            {{- include "corveil.envFrom" . | nindent 12 }}
           ports:
             - name: http
               containerPort: 8000
               protocol: TCP
+          # serve runs migrations before it listens, so the first boot of a new
+          # release can take a while; the startup probe covers that window.
+          startupProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 5
+            timeoutSeconds: 5
+            failureThreshold: 120
           livenessProbe:
             httpGet:
               path: /health
               port: http
-            initialDelaySeconds: 10
             periodSeconds: 15
             timeoutSeconds: 5
             failureThreshold: 3
@@ -93,24 +83,20 @@ spec:
             httpGet:
               path: /health/ready
               port: http
-            initialDelaySeconds: 10
             periodSeconds: 10
             timeoutSeconds: 5
             failureThreshold: 3
           resources:
-            {{- toYaml .Values.resources | nindent 12 }}
+            {{- toYaml .Values.api.resources | nindent 12 }}
+          {{- with (include "corveil.volumeMounts" . | trim) }}
           volumeMounts:
-            - name: models-config
-              mountPath: /app/config/models.yaml
-              subPath: models.yaml
-            {{- with .Values.extraVolumeMounts }}
-            {{- toYaml . | nindent 12 }}
-            {{- end }}
+            {{- . | nindent 12 }}
+          {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- with .Values.affinity }}
+      {{- with (.Values.api.affinity | default .Values.affinity) }}
       affinity:
         {{- toYaml . | nindent 8 }}
       {{- end }}
